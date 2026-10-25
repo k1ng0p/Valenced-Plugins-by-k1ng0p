@@ -1,0 +1,130 @@
+{
+  "format": 1,
+  "name": "Valanced Plugins by k1ng_op",
+  "description": "Stuff I’ve made and ported for Valanced",
+  "plugins": {
+    "k1ngop.instant-actions": {
+      "name": "Instant Actions",
+      "description": "No more 'Are you sure?' Skips deletes, leaves, blocks, and other prompts. Toggle each one individually.",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "icon": "FlashIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.instant-actions@1.0.0.zip",
+          "sha256": "850efed88f3b98a0c01b47f9ad926a2e45d1826030139290ed75f97fbe3d33ac",
+          "size": 2905,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "k1ngop.last-online-tracker": {
+      "name": "Last Online Tracker",
+      "description": "Shows when someone was last online in the DM list, member list and DM header.",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "icon": "HourglassIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.last-online-tracker@1.0.0.zip",
+          "sha256": "b026aad7da9a8b884c0f128ae30474730f45c2fb2e618b20a84b5b5d6d11a6a8",
+          "size": 3437,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "k1ngop.platform-indicators": {
+      "name": "Platform Indicators",
+      "description": "Adds platform indicators (Desktop, Mobile, Web...) to users",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "contributors": [
+        "Martinz64"
+      ],
+      "icon": "UserPlatformIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.platform-indicators@1.0.0.zip",
+          "sha256": "283e7488391e0bbf8ea530d187915d4b531033f7437dcc3f63ef833ca91f385f",
+          "size": 5564,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "k1ngop.profile-replies": {
+      "name": "Profile Replies",
+      "description": "Reply or react to a friend's custom status or bio straight from their profile. Your message arrives as a DM that quotes what you answered.",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "icon": "ic_swipe_reply_24px",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.profile-replies@1.0.0.zip",
+          "sha256": "c8432491e0665f388eb730f38fdd08fd7bf9fef720ed21e2e8544cccf47ce634",
+          "size": 3211,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "k1ngop.watchlist": {
+      "name": "Watchlist",
+      "description": "Shows toasts when users you track change status, start typing, or send a message.",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "icon": "EyeIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.watchlist@1.0.0.zip",
+          "sha256": "f83f93cb0eb917029de46b535d369101137612e3e7e13368a112c5c08e7d515d",
+          "size": 3485,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    }
+  }
+}

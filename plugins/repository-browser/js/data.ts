@@ -469,7 +469,10 @@ async function fetchRepoList() {
 		try {
 			const res = await fetch(`${REMOTE_LIST}?t=${Date.now()}`, { signal: controller.signal })
 			if (res.ok) return parseRepoList(await res.json())
-			if (res.status < 500) return null
+			if (res.status < 500) {
+				reportError(new Error(`HTTP ${res.status}`), 'load the repository list')
+				return null
+			}
 		} catch (e) {
 			// offline or timed out keeps the saved list, but a list that can't be read is worth reporting
 			if (e instanceof SyntaxError) reportError(e, 'read the repository list')

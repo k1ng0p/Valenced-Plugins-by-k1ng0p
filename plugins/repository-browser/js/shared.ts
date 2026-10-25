@@ -57,7 +57,7 @@ export type ValencedRepo = { url: string; enabled: boolean; internal?: boolean }
 
 // the repository list lives on GitHub so it can change without a plugin update
 export const REMOTE_LIST =
-	'https://raw.githubusercontent.com/k1ng0p/revenge-next-plugins/refs/heads/main/plugins/Repository%20Browser/js/plugin-browser-repos.json'
+	'https://raw.githubusercontent.com/k1ng0p/Valenced-Plugins-by-k1ng0p/refs/heads/main/plugins/repository-browser/js/plugin-browser-repos.json'
 
 export const KEY = 'RepositoryBrowser'
 export const DAY = 24 * 60 * 60 * 1000

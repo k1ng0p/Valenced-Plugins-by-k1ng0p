@@ -1,246 +1,41 @@
-# Valenced Plugin Template
+# k1ng0p Valenced Plugins
 
-This repository is a starter monorepo for external Valenced plugins. Each plugin becomes one ZIP
-file. One repository can hold any number of plugins under `plugins/`, and theme plugins under `themes/`.
+Valenced plugin repository.
 
-A plugin has up to three parts. Its own `manifest.json` declares all of them:
+## Install
 
-- **`dist.android`** is native Kotlin code. The build compiles it to a DEXed JAR, and the plugin loader loads it with `DexClassLoader`.
-  This code runs early, before the JS bundle.
-- **`dist.script`** is the JavaScript bundle. The Valenced JS side runs it.
-
-## Layout
-
-Each folder under `plugins/` is one plugin. A plugin is **native** when it has a `src/main` folder.
-A plugin is **JS-only** when it has only a JS entry file. A plugin can have both.
+In Revenge: **Settings → General → Plugins → Add repository**, then paste:
 
 ```
-├── plugins/
-│   ├── example-plugin/            # Native + JS
-│   │   ├── assets/test.txt        # assets, read using pluginDir
-│   │   ├── manifest.json          # id, metadata, dist.* paths
-│   │   ├── tsconfig.json          # the plugin's own type-check project
-│   │   ├── src/main/kotlin/com/example/plugin/MyPlugin.kt   # -> plugin.jar
-│   │   └── js/index.ts            # -> index.js
-│   ├── example-js-plugin/         # JS-only: no src/main, no dist.android
-│   │   ├── manifest.json
-│   │   └── js/index.ts
-│   ├── example-library/           # Dependency example: the plugin others depend on
-│   └── example-dependent/         # Dependency example: depends on com.example.library
-├── themes/                        # Theme plugins, built and packaged like plugins/
-│   ├── example-emoji/             # Emoji packs
-│   ├── example-fonts/             # Font packs
-│   ├── example-icons/             # Icon packs
-│   └── example-themes/            # Themes & backgrounds
+https://k1ng0p.github.io/revenge-next-plugins/
 ```
 
-The bundler looks for the JS entry in this order: `js/index.*`, then `src/index.*`, then `index.*` in the plugin folder.
-Each step accepts `.ts`, `.tsx`, `.js` and `.jsx`.
+## Plugins
 
-To add a plugin, create `plugins/<name>/manifest.json` and add a `src/main` folder for native code, a JS entry file, or both.
+### Original
 
-Give each plugin a `tsconfig.json` that extends the shared settings:
-
-```json
-{ "extends": "../../tsconfig.base.json" }
-```
-
-Each plugin is type-checked as its own project, so types one plugin adds, such as a dependency's API types
-or hidden types, don't leak into other plugins. A plugin without a `tsconfig.json` isn't type-checked.
-
-## Prerequisites
-
-- **JDK 25 or later** and the **Android SDK**, with `build-tools` and `platform 36`.
-  Don't forget to set `sdk.dir` in `local.properties`, or set the `ANDROID_HOME` environment variable.
-- **[Bun](https://bun.com/)** or **[Node.js](https://nodejs.org/)**.
-- **The Valenced plugin API in your local Maven repository.** Run this in the [`Valenced/valenced`](https://github.com/Valenced/valenced) repository:
-
-  ```sh
-  ./gradlew :core:publishToMavenLocal :android:api:publishToMavenLocal
-  ```
-
-  The tasks publish `app.valenced:core` and `app.valenced:api`. `gradle/libs.versions.toml` pins the version.
-
-### Fetching packages from GitHub Packages
-
-Valenced API is published to GitHub Packages. To fetch packages from GitHub Packages, you'll need to set up a **personal access token** with `read:packages`.
-
-This template requires you to put the token in your local Gradle properties file (`~/.gradle/gradle.properties`):
-
-```properties
-GitHubPackagesUsername=YOUR_GITHUB_USERNAME
-GitHubPackagesPassword=YOUR_PERSONAL_ACCESS_TOKEN
-```
-
-## Build
-
-Build and package every plugin:
-
-```sh
-./gradlew packageAllPlugins
-```
-
-The task writes one `build/dist/<id>@<version>.zip` per plugin. Each ZIP holds `manifest.json`, the
-dexed JAR of a native plugin, and the JS bundle of a plugin that has one. The version comes from
-`manifest.json`, so an artifact always states which version it holds.
-
-Build one plugin, or only one part of it:
-
-```sh
-./gradlew packageExamplePlugin              # one plugin -> build/dist/<id>@<version>.zip
-./gradlew :plugins:example-plugin:dexJar    # native only -> plugins/example-plugin/build/outputs/plugin/plugin.jar
-bun install                                 # install the dependencies
-bun run build                               # every JS bundle -> plugins/<name>/build/js/index.js
-bun run build example-plugin                # the JS bundle of one plugin
-bun run build --plugins-dir themes          # every JS bundle under themes/
-```
-
-Gradle derives each package task name from the folder name, example: `plugins/example-plugin/` gives `packageExamplePlugin`. Folder names must be unique across `plugins/` and `themes/`.
-
-## Themes
-
-A theme plugin is a normal plugin that lives under `themes/`. It depends on `valenced.api.themes` and
-registers its themes in `preInit`:
-
-```ts
-/// <reference types="@valenced/themes-api" />
-
-export default plugin({
-  preInit({ themes }) {
-    themes.registerGroup('my-themes', { name: 'My Themes' })
-    themes.registerTheme('my-themes', 'dark', {
-      name: 'Dark',
-      getColors: () => ({}),
-      background: { path: 'assets/background.png' },
-    })
-  },
-})
-```
-
-Besides color themes, the API allows registering font packs (`registerFontPack`), icon packs
-(`registerIconPack`) and emoji packs (`registerEmojiPack`). The examples in `themes/` show
-all available APIs. Asset paths are relative to the plugin folder, and Gradle
-packages `assets/` into the ZIP.
+| Plugin | Description | Source |
+|---|---|---|
+| **Platform Spoof** | Spoofs your Discord gateway platform so others see a different client icon (Desktop, Web, VR, Console) on your profile. | Written by [k1ng0p](https://github.com/k1ng0p) for Revenge Next |
+| **LastOnlineTracker** | Shows "Active X ago" under usernames in the member list once they go offline. | Written by [k1ng0p](https://github.com/k1ng0p) for Revenge Next |
+| **Instant Actions** | Skips confirmation prompts for destructive actions - deleting messages, embeds, channels, leaving servers and groups.| Written by [k1ng0p](https://github.com/k1ng0p) for Revenge Next |
+| **Plugin Browser** | Browse third-party repositories, see what they offer, and add them to Revenge Next.| Written by [k1ng0p](https://github.com/k1ng0p) for Revenge Next |
+| **Disable Call Idle** | Prevents automatic disconnects from idle DM calls.| Written by [k1ng0p](https://github.com/k1ng0p) for Revenge Next |
+| **Junk Cleanup** | Hides useless Discord UI: Nitro and quest upsells, extra message menu rows, settings sections, server header buttons, voice call clutter and profile cosmetics. | Written by [k1ng0p](https://github.com/k1ng0p) for Revenge Next |
+| **Watchlist** | Shows toasts when your friends or tracked users change status, start typing, or send a message.| Written by [k1ng0p](https://github.com/k1ng0p) for Revenge Next |
+| **Status Reply** | Reply to friends' custom statuses straight from their profile, just like the desktop app.| Written by [k1ng0p](https://github.com/k1ng0p) for Revenge Next |
 
 
-## `manifest.json`
+### Ported
 
-```jsonc
-{
-  "format": 1,                      // manifest format version. Required. Always 1 today.
-  "id": "com.example.plugin",       // also the folder name on disk
-  "name": "Example Plugin",
-  "description": "...",
-  "author": "Your Name <643945264868098049> (https://discord.com \"Website\")",  // see `author` below
-  "contributors": ["Someone Else <669627189624307712> (mailto:support@discord.com)", "Some Other Person"],  // optional, same format
-  "version": "1.0.0",               // the version of this plugin. Required.
-  "dependencies": {                 // keyed by plugin id
-    "valenced.api": { "version": ">=1" },
-    "discord": { "version": "*" }
-  },
-  "dist": {
-    "script": "index.js",           // relative to the plugin folder
-    "android": {
-      "path": "plugin.jar",         // relative to the plugin folder
-      "class": "com.example.plugin.MyPlugin"  // the class that exposes the `plugin {}` val
-    }
-  }
-}
-```
-
-### `author` and `contributors`
-
-Both use an NPM-like format. Discord user IDs and links are optional and repeatable:
-
-```
-Name <DISCORD_ID_1> <DISCORD_ID_N> (LINK_1) (LINK_N "Optional label")
-```
-
-- Put every Discord ID before the first link.
-- Links must start with `https://`, `http://` or `mailto:`.
-- A plain `Your Name` is still valid.
-
-Valenced shows the author as a button that opens a sheet with everyone's profiles and links. Valenced only shows at most 5 IDs and 5 links per each person.
-Supplying contact information is optional. If the string does not follow the format, Valenced shows it as plain text.
-
-### `version`
-
-Valenced uses its own version scheme. A version is one or more integer segments.
-One lowercase alphanumeric prerelease label can follow. `1.0.0`, `2026.7` and `1.2.0-beta2` are all valid.
-
-Two rules control the order:
-
-- A short version compares as right-padded. `1.2` equals `1.2.0`.
-- A labeled version always sorts before its bare version. `1.2.0-rc` is lower than `1.2.0`.
-
-This scheme looks like SemVer, but it is not SemVer. A CalVer-shaped version works equally well.
-
-### `dependencies`
-
-`dependencies` is a map, and each key is a plugin id:
-
-```jsonc
-"dependencies": {
-  "com.example.library": { "version": ">=1.0 <2", "optional": false }
-}
-```
-
-Every field inside the value is optional. `{}` means `{ "version": "*" }`, which accepts any version.
-The key itself must still exist. The host never assumes a dependency that you do not declare.
-
-A version range uses explicit bounds only: `<`, `<=`, `=`, `>=` and `>`, separated by spaces.
-The range syntax has no `^` and no `~`. The `"*"` wildcard accepts every version.
-
-Ranges are checked at install time, at every boot, and when the user enables the plugin.
-Plugins don't load when required dependencies fail or don't satisfy the version requirements.
-
-Dependencies are resolved **by ID** against the repositories that the user enabled.
-When a dependency lives in another repository, the user must add that repository before installing the plugin.
-
-The `example-library` and `example-dependent` pair shows this. The dependent declares `"com.example.library": { "version": ">=1" }`.
-An install therefore also installs the library. The library always loads and starts first.
-
-If the library is missing or out of range, the dependent never loads.
-
-### Optional dependencies
-
-`"optional": true` marks a dependency that never blocks your plugin.
-Your plugin still loads when that dependency is missing, out of range, or broken.
-
-When the dependency is present, it loads before your plugin, and its code are linked and made available to your plugin.
-
-To detect the dependency, probe for one of its classes:
-
-```kotlin
-val themesAvailable = runCatching {
-    Class.forName("com.example.themes.ThemeApi", false, javaClass.classLoader)
-}.isSuccess
-```
-
-Keep all code that touches the optional API in a separate adapter class. Reference that class only after the probe succeeds.
-A reference to a missing class stays safe until a code path runs it.
-
-In JS, check if your plugin API is decorated:
-
-```ts
-start({ themes }) {
-    const themesAvailable = !!themes
-}
-```
-
-### Reserved IDs
-
-Two dependency IDs are reserved.
-
-- **`valenced.api`** resolves to the Valenced release version, which is the plugin API version.
-  This dependency is **mandatory**. Constrain it to the API versions you tested, for example `">=1 <2"`.
-- **`discord`** resolves to the Discord app version, for example `>=355.0`.
-
-## Native plugins
-
-A native plugin is a **top-level `val`** that you build with the `plugin {}` DSL. You implement no
-interface, and you subclass nothing. The host reads the class that `dist.android.class` names, and
-takes the first `PluginBuilder` value it exposes. You import and use a Ktor plugin value the same
+| Plugin | Description | Source |
+|---|---|---|
+| **Platform Indicators** | Adds platform indicators (Desktop, Mobile, Web) next to usernames in DMs, member list, and profiles. | Original [Vendetta plugin](https://github.com/Martinz64/vendetta-plugins/tree/master/plugins/PlatformIndicators) by [Martinz64](https://github.com/Martinz64), ported by [k1ng0p](https://github.com/k1ng0p) to Revenge Next |
+| **No Idle** | Prevent status from idling when Discord is in the background. | Original [Vendetta plugin](https://github.com/amsryq/letup/tree/main/plugins/NoIdle) by [amsryq](https://github.com/amsryq), ported by [k1ng0p](https://github.com/k1ng0p) to Revenge Next |
+| **Anonymous File Names** | Randomizes file names before you upload them. | Original [Revenge Plugin](https://github.com/shipwr3ckd/revengeplugin#anonymousfilenames) by [Siguma](https://github.com/shipwr3ckd), ported by [k1ng0p](https://github.com/k1ng0p) to Revenge Next |
+| **ValidUser** | Fixes unresolved user mentions like @unknown-user to a normal clickable mention.. | Original [Revenge Plugin](https://github.com/fshinz/Revenge-Plugins/tree/master/plugins/ValidUser) by [fshinz](https://github.com/fshinz), ported by [k1ng0p](https://github.com/k1ng0p) to Revenge Next |
+| **Dashless** | Changes dashes in text channel names to spaces. | Original [Revenge Plugin](https://github.com/Awesomegamergame/bunny-plugins/tree/master/plugins/dashless) by [Awesomegamergame](https://github.com/Awesomegamergame), ported by [k1ng0p](https://github.com/k1ng0p) to Revenge Next |
+akes the first `PluginBuilder` value it exposes. You import and use a Ktor plugin value the same
 way.
 
 ```kotlin

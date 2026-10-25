@@ -1,7 +1,7 @@
 {
   "format": 1,
-  "name": "Valanced Plugins by k1ng_op",
-  "description": "Stuff I’ve made and ported for Valanced",
+  "name": "Valenced Plugins by k1ng_op",
+  "description": "Stuff I’ve made and ported for Valenced",
   "plugins": {
     "k1ngop.instant-actions": {
       "name": "Instant Actions",
@@ -91,6 +91,30 @@
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.profile-replies@1.0.0.zip",
           "sha256": "c8432491e0665f388eb730f38fdd08fd7bf9fef720ed21e2e8544cccf47ce634",
           "size": 3211,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "k1ngop.repository-browser": {
+      "name": "Plugin Browser",
+      "description": "Browse third-party repositories, see what they offer, and add them to Valenced.",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "icon": "ic_browse_channel",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.repository-browser@1.0.0.zip",
+          "sha256": "9745293c0442f102cc1b05f26431b7eec8c1eacffb284f3bc84fdcee1f7167b8",
+          "size": 23519,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"

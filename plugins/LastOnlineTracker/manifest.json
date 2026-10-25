@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "k1ngop.last-online-tracker",
+	"name": "Last Online Tracker",
+	"description": "Shows when someone was last online in the DM list, member list and DM header.",
+	"author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+	"icon": "HourglassIcon",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}

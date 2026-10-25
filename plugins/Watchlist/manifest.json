@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "k1ngop.watchlist",
+	"name": "Watchlist",
+	"description": "Shows toasts when users you track change status, start typing, or send a message.",
+	"author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+	"icon": "EyeIcon",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}

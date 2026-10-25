@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "k1ngop.profile-replies",
+	"name": "Profile Replies",
+	"description": "Reply or react to a friend's custom status or bio straight from their profile. Your message arrives as a DM that quotes what you answered.",
+	"icon": "ic_swipe_reply_24px",
+	"author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}

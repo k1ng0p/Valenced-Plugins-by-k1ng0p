@@ -27,6 +27,30 @@
         }
       }
     },
+    "k1ngop.junk-cleanup": {
+      "name": "Junk Cleanup",
+      "description": "Hides useless UI: profile cosmetics, Nitro upsells, extra menu rows, settings sections, voice call clutter and more.",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "icon": "MagicWandIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.junk-cleanup@1.0.0.zip",
+          "sha256": "46f4ba425184b81b02eef1b99bc7ca66b40d971381e8d9514a3e138735b359ce",
+          "size": 5048,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
     "k1ngop.last-online-tracker": {
       "name": "Last Online Tracker",
       "description": "Shows when someone was last online in the DM list, member list and DM header.",
@@ -67,6 +91,30 @@
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.platform-indicators@1.0.0.zip",
           "sha256": "283e7488391e0bbf8ea530d187915d4b531033f7437dcc3f63ef833ca91f385f",
           "size": 5564,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "k1ngop.platform-spoof": {
+      "name": "Platform Spoof",
+      "description": "Spoofs your Discord gateway platform so others see a different client icon on your profile.",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "icon": "LaptopPhoneIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.platform-spoof@1.0.0.zip",
+          "sha256": "ba5a4c7eb5dacb54dbb0dce04854284683be8e2870b0454842396d3ed6f00c3f",
+          "size": 2702,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"

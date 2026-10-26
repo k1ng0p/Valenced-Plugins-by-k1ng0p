@@ -22,7 +22,7 @@ https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/
 | **Plugin Browser** | Browse third-party repositories, see what they offer, and add them to Valanced.| Written by [k1ng0p](https://github.com/k1ng0p) for Valenced |
 | **Junk Cleanup** | Hides useless Discord UI: Nitro and quest upsells, extra message menu rows, settings sections, server header buttons, voice call clutter and profile cosmetics. | Written by [k1ng0p](https://github.com/k1ng0p) for Valenced |
 | **Watchlist** | Shows toasts when your friends or tracked users change status, start typing, or send a message.| Written by [k1ng0p](https://github.com/k1ng0p) for Valenced |
-| **Status Reply** | Reply to friends' custom statuses straight from their profile, just like the desktop app.| Written by [k1ng0p](https://github.com/k1ng0p) for Valenced |
+| **Profile Replies** | Reply or react to a friend's custom status or bio straight from their profile.| Written by [k1ng0p](https://github.com/k1ng0p) for Valenced |
 
 
 ### Ported

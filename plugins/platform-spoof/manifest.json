@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "k1ngop.platform-spoof",
+	"name": "Platform Spoof",
+	"description": "Spoofs your Discord gateway platform so others see a different client icon on your profile.",
+	"author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+	"icon": "LaptopPhoneIcon",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}

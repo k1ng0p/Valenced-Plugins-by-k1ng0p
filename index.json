@@ -33,13 +33,26 @@
       "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
       "icon": "MagicWandIcon",
       "channels": {
-        "latest": "1.0.0"
+        "latest": "1.1.0"
       },
       "versions": {
         "1.0.0": {
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.junk-cleanup@1.0.0.zip",
           "sha256": "46f4ba425184b81b02eef1b99bc7ca66b40d971381e8d9514a3e138735b359ce",
           "size": 5048,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.1.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.junk-cleanup@1.1.0.zip",
+          "sha256": "1c0631fa4530d327f8501db0f00a2aa3700709ac141e4ccd53d1e435cfa512c0",
+          "size": 5658,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
@@ -128,17 +141,30 @@
     },
     "k1ngop.profile-replies": {
       "name": "Profile Replies",
-      "description": "Reply or react to a friend's custom status or bio straight from their profile. Your message arrives as a DM that quotes what you answered.",
+      "description": "Reply or react to a friend's custom status or bio straight from their profile.",
       "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
       "icon": "ic_swipe_reply_24px",
       "channels": {
-        "latest": "1.0.0"
+        "latest": "1.1.0"
       },
       "versions": {
         "1.0.0": {
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.profile-replies@1.0.0.zip",
           "sha256": "c8432491e0665f388eb730f38fdd08fd7bf9fef720ed21e2e8544cccf47ce634",
           "size": 3211,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.1.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.profile-replies@1.1.0.zip",
+          "sha256": "873ce4d5aee25bb3964cac7885fc833ea882ca44ae7b5b31a4e1bf3d085f5179",
+          "size": 3435,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"

@@ -3,6 +3,33 @@
   "name": "Valenced Plugins by k1ng_op",
   "description": "Stuff I’ve made and ported for Valenced",
   "plugins": {
+    "k1ngop-localeditdelete": {
+      "name": "Local Edit Delete",
+      "description": "Edit or delete any message on your device only. Nothing is sent to Discord.",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "contributors": [
+        "fshinz <1381008677301129257>"
+      ],
+      "icon": "PencilIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop-localeditdelete@1.0.0.zip",
+          "sha256": "88dc287126a4b23e6e4bb2d20d790ba5d7e605bf166fe1640012288e07e610d9",
+          "size": 3435,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
     "k1ngop.instant-actions": {
       "name": "Instant Actions",
       "description": "No more 'Are you sure?' Skips deletes, leaves, blocks, and other prompts. Toggle each one individually.",

@@ -5,6 +5,12 @@
       "source": "https://github.com/k1ng0p/Valenced-Plugins-by-k1ng0p",
       "discord": "641266820187160576",
       "badges": ["Official", "Trusted", "Maintainer"]
+    },
+    {
+      "url": "https://plugins.obamabot.me/valenced-plugins",
+      "source": "https://github.com/WolfPlugs/valenced-plugins",
+      "discord": "347096063569559553",
+      "badges": ["Trusted", "Utility"]
     }
   ]
 }

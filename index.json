@@ -240,6 +240,30 @@
         }
       }
     },
+    "k1ngop.valid-user": {
+      "name": "ValidUser",
+      "description": "Fixes unresolved user mentions like @unknown-user to a normal clickable mention.",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "icon": "ic_mention_24px",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.valid-user@1.0.0.zip",
+          "sha256": "c5df43da999b5462cf0de9c6e100d0bb6d53dccf469c708fe2f8bfb810aa1c98",
+          "size": 1624,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
     "k1ngop.watchlist": {
       "name": "Watchlist",
       "description": "Shows toasts when users you track change status, start typing, or send a message.",

@@ -166,6 +166,12 @@ export const GROUPS = [
 				label: 'Files button',
 				hint: 'Bottom bar of the attach panel',
 			},
+			{
+				key: 'attachCamera',
+				label: 'Camera shortcut',
+				hint: 'Camera tile at the start of the photo grid',
+				preset: true,
+			},
 		],
 	},
 	{
@@ -227,6 +233,23 @@ export const GROUPS = [
 				key: 'guildEvents',
 				label: 'Events button',
 				hint: 'Calendar button next to the server search',
+				preset: true,
+			},
+		],
+	},
+	{
+		title: 'AI features',
+		options: [
+			{
+				key: 'aiConjureRow',
+				label: 'Conjure channel row',
+				hint: 'Conjure entry in the server channel list',
+				preset: true,
+			},
+			{
+				key: 'aiConjureButton',
+				label: 'Conjure button',
+				hint: 'Wand button in the You bar',
 				preset: true,
 			},
 		],

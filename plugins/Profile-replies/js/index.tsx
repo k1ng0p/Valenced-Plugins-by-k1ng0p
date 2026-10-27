@@ -6,6 +6,7 @@ import {
 } from '@valenced/discord/actions'
 import { Design } from '@valenced/discord/design'
 import { Stores } from '@valenced/discord/flux'
+import { Clipboard } from '@valenced/externals/react-native-clipboard'
 import { getModules, lookupModule } from '@valenced/modules/finders'
 import {
 	withDependencies,
@@ -23,10 +24,12 @@ import type { StyleProp, ViewStyle } from 'react-native'
 
 export interface Settings {
 	bio: boolean
+	copy: boolean
 }
 
 const DefaultSettings: Settings = {
 	bio: true,
+	copy: true,
 }
 
 const ALERT_KEY = 'k1ngop.profile-replies'
@@ -49,11 +52,12 @@ interface Target {
 interface StatusActivity {
 	type?: number
 	state?: string
-	emoji?: { id?: string; name?: string } | null
+	emoji?: { id?: string; name?: string; animated?: boolean } | null
 }
 
 interface StatusPillProps {
 	customStatusActivity?: StatusActivity
+	user?: { id: string }
 }
 
 interface BioTextProps {
@@ -158,6 +162,15 @@ function bioText(bio: string) {
 		.join('\n')
 }
 
+// Exactly what the profile shows, custom emoji included, for copying.
+function rawStatus({ emoji, state }: StatusActivity) {
+	const emojiText = emoji?.id
+		? `<${emoji.animated ? 'a' : ''}:${emoji.name}:${emoji.id}>`
+		: emoji?.name
+
+	return [emojiText, state].filter(Boolean).join(' ')
+}
+
 // Discord epoch is 2015-01-01
 const snowflake = () => (BigInt(Date.now() - 1420070400000) << 22n).toString()
 
@@ -190,6 +203,9 @@ export default plugin<{ jsonStorage: Settings }>({
 		default: DefaultSettings,
 	},
 	start({ cleanup, jsonStorage: storage, plugin }) {
+		const enabled = (key: keyof Settings) =>
+			storage.cache?.[key] ?? DefaultSettings[key]
+
 		const refs: {
 			presence?: PresenceStore
 			friends?: RelationshipStore
@@ -242,6 +258,9 @@ export default plugin<{ jsonStorage: Settings }>({
 						?.getActivities(id)
 						?.some(a => a.type === CUSTOM_STATUS && a === activity),
 				)
+
+		const isFriend = (userId: string) =>
+			!!refs.friends?.getFriendIDs().includes(userId)
 
 		const nameOf = (userId: string) => {
 			const user = (Stores.UserStore as unknown as UserStore).getUser(userId)
@@ -335,14 +354,27 @@ export default plugin<{ jsonStorage: Settings }>({
 
 		let ReactionIcon: ReturnType<typeof lookupGeneratedIconComponent>
 		let ReplyIcon: ReturnType<typeof lookupGeneratedIconComponent>
+		let CopyIcon: ReturnType<typeof lookupGeneratedIconComponent>
 
 		function TargetMenu({
-			target,
+			subject,
+			text,
+			raw,
+			userId,
+			reply,
+			copy,
 			children,
 		}: {
-			target: Target
+			subject: Target['subject']
+			text: string
+			raw: string
+			userId?: string
+			reply: boolean
+			copy: boolean
 			children: ComponentProps<typeof Design.ContextMenu>['children']
 		}) {
+			const target = reply && userId ? { userId, subject, text } : undefined
+
 			// triggerOnTap is missing from ContextMenuProps but supported by the menu.
 			const { ContextMenu: Menu } = Design as {
 				ContextMenu: FC<
@@ -352,27 +384,44 @@ export default plugin<{ jsonStorage: Settings }>({
 
 			ReactionIcon ??= lookupGeneratedIconComponent('ReactionIcon')
 			ReplyIcon ??= lookupGeneratedIconComponent('ArrowAngleLeftUpIcon')
+			CopyIcon ??= lookupGeneratedIconComponent('CopyIcon')
 
 			return (
 				<Menu
-					title={`${nameOf(target.userId)}'s ${target.subject}`}
+					title={userId ? `${nameOf(userId)}'s ${subject}` : `Copy ${subject}`}
 					items={[
-						{
-							label: 'React',
-							IconComponent: ReactionIcon,
-							action: () => {
-								clearTimeout(pendingReact)
-								pendingReact = setTimeout(
-									() => openReact(target),
-									MENU_CLOSE_MS,
-								)
-							},
-						},
-						{
-							label: 'Reply',
-							IconComponent: ReplyIcon,
-							action: () => openReply(target),
-						},
+						...(target
+							? [
+									{
+										label: 'React',
+										IconComponent: ReactionIcon,
+										action: () => {
+											clearTimeout(pendingReact)
+											pendingReact = setTimeout(
+												() => openReact(target),
+												MENU_CLOSE_MS,
+											)
+										},
+									},
+									{
+										label: 'Reply',
+										IconComponent: ReplyIcon,
+										action: () => openReply(target),
+									},
+								]
+							: []),
+						...(copy
+							? [
+									{
+										label: `Copy ${subject}`,
+										IconComponent: CopyIcon,
+										action: () => {
+											Clipboard.setString(raw)
+											ToastActionCreators.open(ALERT_KEY, { text: 'Copied' })
+										},
+									},
+								]
+							: []),
 					]}
 					triggerOnTap
 				>
@@ -388,13 +437,20 @@ export default plugin<{ jsonStorage: Settings }>({
 		}: StatusPillProps & { Pill: Pill<StatusPillProps> }) {
 			const el = Pill(props)
 			const activity = props.customStatusActivity
-			const userId = activity && ownerOf(activity)
+			const userId = props.user?.id ?? (activity && ownerOf(activity))
+			const reply = !!userId && isFriend(userId)
+			const copy = enabled('copy')
 
-			if (!isValidElement(el) || !activity || !userId) return el
+			if (!isValidElement(el) || !activity || !(reply || copy)) return el
 
 			return (
 				<TargetMenu
-					target={{ userId, subject: 'status', text: statusText(activity) }}
+					subject="status"
+					text={statusText(activity)}
+					raw={rawStatus(activity)}
+					userId={userId}
+					reply={reply}
+					copy={copy}
 				>
 					{({ ref }) => anchorFor(el, ref)}
 				</TargetMenu>
@@ -407,19 +463,21 @@ export default plugin<{ jsonStorage: Settings }>({
 		}: BioTextProps & { Pill: Pill<BioTextProps> }) {
 			const el = Pill(props)
 			const { bio, userId } = props
-			const text = bio && bioText(bio)
+			const text = bio ? bioText(bio) : ''
+			const reply = !!text && !!userId && enabled('bio') && isFriend(userId)
+			const copy = enabled('copy')
 
-			if (
-				!isValidElement(el) ||
-				!text ||
-				!userId ||
-				!(storage.cache?.bio ?? DefaultSettings.bio) ||
-				!refs.friends?.getFriendIDs().includes(userId)
-			)
-				return el
+			if (!isValidElement(el) || !bio || !(reply || copy)) return el
 
 			return (
-				<TargetMenu target={{ userId, subject: 'bio', text }}>
+				<TargetMenu
+					subject="bio"
+					text={text}
+					raw={bio}
+					userId={userId}
+					reply={reply}
+					copy={copy}
+				>
 					{({ ref }) => (
 						<View ref={ref as never} collapsable={false}>
 							{el}

@@ -457,6 +457,9 @@ const COMPONENT_RULES = new Map<string, OptionKey>([
 	['VoicePanelFloatingCTAContainer', 'voiceAddPeople'],
 	// The Xbox and PlayStation rows in the call options
 	['GameConsoleAccountButton', 'voiceConsole'],
+	// Conjure: its row in the channel list and its wand button in the user bar
+	['ConjureChannelRow', 'aiConjureRow'],
+	['ConjureYouBarButton', 'aiConjureButton'],
 ])
 
 const CONSOLE_BUTTON = 'GameConsoleAccountButton'
@@ -467,13 +470,18 @@ const SHEET_COMPONENT_RULES = new Map<string, OptionKey>([
 	['EmojiRow', 'msgReactions'],
 ])
 
-function componentRules(env: Env) {
-	const holdsConsoleButton = (children: unknown) =>
-		React.Children.toArray(children as any).some(
-			child =>
-				nameOfType((child as { type?: unknown })?.type) === CONSOLE_BUTTON,
+/** True when a component with this name is among the children, a few levels down at most */
+function hasChildNamed(children: unknown, name: string, depth = 3): boolean {
+	return React.Children.toArray(children as any).some(child => {
+		const element = child as { type?: unknown; props?: { children?: unknown } }
+		return (
+			nameOfType(element?.type) === name ||
+			(depth > 1 && hasChildNamed(element?.props?.children, name, depth - 1))
 		)
+	})
+}
 
+function componentRules(env: Env) {
 	for (const factory of ['jsx', 'jsxs'] as const)
 		env.cleanup(
 			instead(ReactJSXRuntime as any, factory, (args: any[], original: any) => {
@@ -489,7 +497,29 @@ function componentRules(env: Env) {
 					if (
 						name === 'TableRowGroup' &&
 						isOn('voiceConsole') &&
-						holdsConsoleButton(args[1]?.children)
+						hasChildNamed(args[1]?.children, CONSOLE_BUTTON)
+					)
+						return null
+					// Photo grid: shift the rows so removing the camera leaves no gap
+					if (
+						name === 'FastList' &&
+						isOn('attachCamera') &&
+						typeof args[1]?.renderItem === 'function' &&
+						(new Error().stack ?? '').includes('MediaKeyboard')
+					)
+						return original(
+							args[0],
+							{
+								...args[1],
+								renderItem: withoutCameraItem(env, args[1].renderItem),
+							},
+							args[2],
+						)
+					// The camera tile in the photo grid is a special button holding a camera icon
+					if (
+						name === 'MediaKeyboardSpecialButton' &&
+						isOn('attachCamera') &&
+						hasChildNamed(args[1]?.children, 'CameraIcon')
 					)
 						return null
 				}
@@ -578,6 +608,74 @@ function attachPanel(env: Env) {
 				return original(...args)
 			}),
 		)
+}
+
+// ---------------------------------------------------------------------------
+// Photo grid without the camera tile
+// ---------------------------------------------------------------------------
+
+/** How a row index is passed to a list's renderItem, which differs between list versions */
+interface RowCall {
+	row: number
+	at: (row: number) => unknown[]
+}
+
+function readRowCall(args: any[]): RowCall | undefined {
+	const first = args[0]
+	if (first && typeof first === 'object') {
+		for (const key of ['row', 'index'] as const)
+			if (typeof first[key] === 'number')
+				return {
+					row: first[key],
+					at: row => [{ ...first, [key]: row }, ...args.slice(1)],
+				}
+	}
+	if (typeof args[0] === 'number' && typeof args[1] === 'number')
+		return { row: args[1], at: row => [args[0], row, ...args.slice(2)] }
+}
+
+/**
+ * The picker lays its items out in rows of four, and the camera is the first
+ * item of the first row. Dropping it alone leaves a hole at the end of that row,
+ * so every row takes its first item from the row after it instead.
+ */
+function withoutCameraItem(env: Env, renderItem: (...args: any[]) => any) {
+	const rowAt = (call: RowCall, row: number) => {
+		try {
+			return renderItem(...call.at(row))
+		} catch {
+			return undefined
+		}
+	}
+
+	return (...args: any[]) => {
+		const rendered = renderItem(...args)
+		try {
+			const call = readRowCall(args)
+			if (
+				!call ||
+				!isOn('attachCamera') ||
+				nameOfType(rendered?.type) !== 'MediaKeyboardItem'
+			)
+				return rendered
+			const firstRow = call.row === 0 ? rendered : rowAt(call, 0)
+			if (firstRow?.props?.items?.[0]?.type !== 'camera') return rendered
+
+			const items: unknown[] = rendered.props.items.slice(1)
+			const following = rowAt(call, call.row + 1)
+			const borrowed = following?.props?.items?.[0]
+			if (borrowed) items.push(borrowed)
+			if (items.length === 0) return null
+
+			return React.cloneElement(rendered, {
+				items,
+				totalNumItems: rendered.props.totalNumItems - 1,
+			})
+		} catch (e) {
+			env.fail(e)
+			return rendered
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------

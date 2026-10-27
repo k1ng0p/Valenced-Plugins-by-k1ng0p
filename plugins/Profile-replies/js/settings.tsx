@@ -13,7 +13,7 @@ export default function SettingsComponent({
 	api: { jsonStorage: storage },
 }: SettingComponentProps) {
 	const { TableRowGroup, TableSwitchRow } = Design
-	const { bio } = storage.use()!
+	const { bio, copy } = storage.use()!
 
 	return (
 		<Page>
@@ -24,6 +24,13 @@ export default function SettingsComponent({
 					subLabel="Tap a friend's bio on their profile to react or reply."
 					value={bio ?? true}
 					onValueChange={bio => storage.set({ bio })}
+				/>
+				<TableSwitchRow
+					icon={<TableRowAssetIcon name="CopyIcon" />}
+					label="Copy status and bio"
+					subLabel="Add a Copy option to every user's status and bio menu."
+					value={copy ?? true}
+					onValueChange={copy => storage.set({ copy })}
 				/>
 			</TableRowGroup>
 		</Page>

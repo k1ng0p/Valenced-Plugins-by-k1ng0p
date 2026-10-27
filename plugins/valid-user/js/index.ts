@@ -2,7 +2,7 @@ import { ToastActionCreators } from '@valenced/discord/actions'
 import { Dispatcher } from '@valenced/discord/common/flux'
 import { ImportTrackerModuleId } from '@valenced/discord/common/import-tracker'
 import { LoggerModuleId } from '@valenced/discord/common/logger'
-import { Stores, withStoreName } from '@valenced/discord/flux'
+import { withStoreName } from '@valenced/discord/flux'
 import { Clipboard } from '@valenced/externals/react-native-clipboard'
 import { getModules, lookupModule } from '@valenced/modules/finders'
 import {
@@ -25,53 +25,12 @@ type Http = {
 	HTTP: { get(options: { url: string }): Promise<{ body?: unknown }> }
 }
 
-interface Message {
-	id: string
-	content?: string
-}
-
 async function cacheUser(userId: string) {
 	http ??= lookupModule(withProps('HTTP', 'post'))[0] as Http | undefined
 	if (!http) throw new Error('HTTP module not found')
 
 	const { body } = await http.HTTP.get({ url: `/users/${userId}` })
 	Dispatcher.dispatch({ type: 'USER_UPDATE', user: body })
-}
-
-const REDRAW_DELAY = 110
-const redraws = new Set<ReturnType<typeof setTimeout>>()
-
-// Messages keep the mention they were first rendered with, so the cached user alone changes nothing.
-// A temporary content change followed by the real content makes the open channel render them again.
-function redrawMentions(userId: string) {
-	const channelId = (
-		Stores.SelectedChannelStore as DiscordModules.Flux.Store<{
-			getChannelId(): string | undefined
-		}>
-	).getChannelId()
-	if (!channelId) return
-
-	const { getMessages } = Stores.MessageStore as DiscordModules.Flux.Store<{
-		getMessages(channelId: string): { toArray(): Message[] }
-	}>
-	const mention = new RegExp(`<@!?${userId}>`)
-
-	for (const { id, content } of getMessages(channelId).toArray()) {
-		if (!content || !mention.test(content)) continue
-
-		Dispatcher.dispatch({
-			type: 'MESSAGE_UPDATE',
-			message: { id, channel_id: channelId, content: `${content}\u200b` },
-		})
-		const timer = setTimeout(() => {
-			redraws.delete(timer)
-			Dispatcher.dispatch({
-				type: 'MESSAGE_UPDATE',
-				message: { id, channel_id: channelId, content },
-			})
-		}, REDRAW_DELAY)
-		redraws.add(timer)
-	}
 }
 
 let profileSheet: ProfileSheet | undefined
@@ -142,10 +101,6 @@ function readUserId(copyUserId: () => void) {
 
 export default plugin({
 	start({ cleanup, plugin }) {
-		cleanup(() => {
-			for (const timer of redraws) clearTimeout(timer)
-			redraws.clear()
-		})
 		cleanup(
 			getModules(withProps('show', 'close', 'openLazy', 'confirm'), alerts => {
 				cleanup(
@@ -156,12 +111,10 @@ export default plugin({
 								profileSheet ??= findProfileSheet()
 								if (userId && profileSheet) {
 									const openProfile = profileSheet
-									// The sheet crashes the app for accounts that fail to load, so it only opens once the user is cached.
 									cacheUser(userId)
 										.then(
 											() => {
 												openProfile({ userId })
-												redrawMentions(userId)
 											},
 											error => {
 												plugin.reportError(error)

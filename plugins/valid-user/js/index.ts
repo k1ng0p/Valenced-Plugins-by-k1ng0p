@@ -155,9 +155,19 @@ export default plugin({
 								const userId = readUserId(props.onConfirmSecondary)
 								profileSheet ??= findProfileSheet()
 								if (userId && profileSheet) {
-									profileSheet({ userId })
+									const openProfile = profileSheet
+									// The sheet crashes the app for accounts that fail to load, so it only opens once the user is cached.
 									cacheUser(userId)
-										.then(() => redrawMentions(userId))
+										.then(
+											() => {
+												openProfile({ userId })
+												redrawMentions(userId)
+											},
+											error => {
+												plugin.reportError(error)
+												orig(props)
+											},
+										)
 										.catch(plugin.reportError)
 									return
 								}

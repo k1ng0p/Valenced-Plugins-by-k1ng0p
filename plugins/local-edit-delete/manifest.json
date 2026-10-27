@@ -1,0 +1,21 @@
+{
+	"format": 1,
+	"id": "k1ngop-localeditdelete",
+	"name": "Local Edit Delete",
+	"description": "Edit or delete any message on your device only. Nothing is sent to Discord.",
+	"icon": "PencilIcon",
+	"author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+	"contributors": ["fshinz <1381008677301129257>"],
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}

@@ -5,7 +5,7 @@
 	"description": "Hides useless UI: profile cosmetics, Nitro upsells, extra menu rows, settings sections, voice call clutter and more.",
 	"icon": "MagicWandIcon",
 	"author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"dependencies": {
 		"valenced.api": { "version": ">=1 <2" },
 		"discord": { "version": "*" }

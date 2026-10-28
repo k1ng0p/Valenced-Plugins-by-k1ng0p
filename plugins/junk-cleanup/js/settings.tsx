@@ -23,7 +23,10 @@ export default function SettingsPage({ api: { jsonStorage: storage } }: Props) {
 	const values = { ...DEFAULTS, ...storage.use() }
 
 	return (
-		<ScrollView>
+		<ScrollView
+			style={{ flex: 1 }}
+			contentContainerStyle={{ paddingBottom: 48 }}
+		>
 			<Page>
 				<Stack spacing={16}>
 					{GROUPS.map(group => (

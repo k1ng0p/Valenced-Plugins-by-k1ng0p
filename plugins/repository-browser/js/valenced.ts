@@ -1,6 +1,6 @@
 import { RootNavigationRef } from '@valenced/discord/modules/main_tabs_v2'
 import { formatVersion } from '@valenced/plugins/utils'
-import { BUILT_IN_REPO, askReload, asObject, clearProblems, confirm, errorMessage, fail, logProblem, native, reportError, showError, slash, usesEnvelope } from './shared'
+import { BUILT_IN_REPO, askReload, asObject, clearProblems, confirm, errorMessage, fail, logProblem, native, reportError, showError, slash, tap, usesEnvelope } from './shared'
 import type { AvailableUpdate, ListedPlugin, PluginRef, Repo, ValencedRepo } from './shared'
 export type PendingUpdate = { id: string; name: string; installed: string; available: string; channel: string }
 export type ValencedState = Awaited<ReturnType<typeof readState>>
@@ -8,6 +8,8 @@ export type ValencedState = Awaited<ReturnType<typeof readState>>
 export const available = new Map<string, AvailableUpdate>()
 export const blocked = new Map<string, { repo: string; text: string }>()
 export const pendingReload = new Set<string>()
+// ids offered by the repositories added to Valenced, a dependency from any of them can be installed
+export const providedIds = new Set<string>()
 
 let repoWrites: Promise<unknown> = Promise.resolve()
 
@@ -19,6 +21,24 @@ const warningMessages = (plan: any): string[] =>
 		.map((warning: any) => (typeof warning === 'string' ? warning : warning?.message))
 		.filter(Boolean)
 
+async function refreshProvided(repos: ValencedRepo[]) {
+	const found = new Set<string>()
+	await Promise.all(
+		repos
+			.filter(repo => repo.enabled)
+			.map(repo =>
+				native('valenced.plugins.repos.listPlugins', [repo.url]).then(
+					(list: { id: string }[] | null) => {
+						for (const item of list ?? []) found.add(item.id)
+					},
+					error => logProblem(`list ${repo.url}`, error),
+				),
+			),
+	)
+	providedIds.clear()
+	for (const id of found) providedIds.add(id)
+}
+
 export async function readState() {
 	const envelope = await usesEnvelope()
 	const [repos, plugins, saved, slots] = await Promise.all([
@@ -27,6 +47,8 @@ export async function readState() {
 		native('valenced.plugins.states.read'),
 		envelope ? native('valenced.plugins.states.getSlots').catch(() => null) : null,
 	])
+
+	await refreshProvided(repos ?? [])
 
 	const installed = new Map<string, { version: string; settings: boolean; source: { repo: string | null; channel: string; held: boolean } | null }>()
 	let discord: string | undefined
@@ -151,7 +173,28 @@ export const THEME_SUPPORT = [
 ]
 export const THEMES_SETTINGS = 'valenced.settings.themes'
 
-export const setHeld = (id: string, held: boolean) => native('valenced.plugins.setHeld', [id, held])
+export const setHeld = (id: string, held: boolean) =>
+	native('valenced.plugins.setHeld', [id, held]).then(result => {
+		tap()
+		return result
+	})
+
+// the plugin comes from the chosen repository, what it depends on from any repository added to Valenced
+const planTarget = (id: string, repo: string, target?: { version: string } | { channel: string }) => ({ targets: { [id]: { repo, ...target } } })
+
+// asks Valenced whether a plugin can be installed, so the reason shows before anyone taps Install
+export async function checkInstall(repoUrl: string, plugin: ListedPlugin, ref?: PluginRef) {
+	try {
+		const known = (await repoList()).find(repo => slash(repo.url) === slash(repoUrl))
+		if (!known?.enabled) return null
+		const envelope = await usesEnvelope()
+		const target = ref?.type === 'version' ? { version: ref.version } : ref ? { channel: ref.channel } : undefined
+		await native('valenced.plugins.planInstall', envelope ? [plugin.id, planTarget(plugin.id, known.url, target)] : [plugin.id, null, null, [known.url]])
+		return null
+	} catch (e) {
+		return errorMessage(e).split('\n')[0]
+	}
+}
 
 export function openPluginSettings(id: string) {
 	const nav = RootNavigationRef.getRootNavigationRef()
@@ -164,6 +207,7 @@ export async function uninstall(plugin: ListedPlugin, dependents: string[] = [])
 	try {
 		await native('valenced.plugins.setEnabled', [plugin.id, false, false]).catch(() => {})
 		await native('valenced.plugins.uninstall', [plugin.id])
+		tap()
 		askReload('Uninstalled. Reload to apply it.')
 		return true
 	} catch (e) {
@@ -187,8 +231,7 @@ export async function install(repoUrl: string, plugin: ListedPlugin, ref?: Plugi
 
 		const envelope = await usesEnvelope()
 		const target = ref?.type === 'version' ? { version: ref.version } : ref ? { channel: ref.channel } : undefined
-		const options = { repos: [known.url], ...(target && { targets: { [plugin.id]: target } }) }
-		const plan = await native('valenced.plugins.planInstall', envelope ? [plugin.id, options] : [plugin.id, null, null, [known.url]])
+		const plan = await native('valenced.plugins.planInstall', envelope ? [plugin.id, planTarget(plugin.id, known.url, target)] : [plugin.id, null, null, [known.url]])
 		const others = plan.actions.filter((action: any) => action.id !== plugin.id).map((action: any) => `${action.id} ${action.version}`)
 		const warnings = warningMessages(plan)
 
@@ -199,6 +242,7 @@ export async function install(repoUrl: string, plugin: ListedPlugin, ref?: Plugi
 		if (!(await confirm('Install plugin?', lines.join('\n\n')))) return false
 
 		const result = await native('valenced.plugins.install', [plan])
+		tap()
 		if (result?.pending?.length) askReload('Installed. Reload to apply it.')
 		return true
 	} catch (e) {
@@ -227,6 +271,7 @@ export async function updatePlugins(updates: PendingUpdate[]) {
 			pendingReload.add(updates[index].id)
 			done.push(updates[index])
 		}
+		tap()
 		askReload('Updated. Reload to apply it.')
 		return true
 	} catch (e) {
@@ -259,6 +304,7 @@ async function setEnabled(id: string, on: boolean) {
 export async function toggle(id: string, on: boolean) {
 	try {
 		await setEnabled(id, on)
+		tap()
 		askReload(`${on ? 'Enabled' : 'Disabled'}. Reload to apply it.`)
 		return true
 	} catch (e) {
@@ -284,7 +330,7 @@ export async function installMany(items: BulkItem[]) {
 		for (const item of items) {
 			const repo = urlOf(item.repo)
 			try {
-				plans.push(await native('valenced.plugins.planInstall', envelope ? [item.id, { repos: [repo] }] : [item.id, null, null, [repo]]))
+				plans.push(await native('valenced.plugins.planInstall', envelope ? [item.id, planTarget(item.id, repo)] : [item.id, null, null, [repo]]))
 				planned.push(item)
 			} catch (e) {
 				skipped.push(`${item.name}: ${errorMessage(e).split('\n')[0]}`)
@@ -311,6 +357,7 @@ export async function installMany(items: BulkItem[]) {
 			}
 			done.push(planned[index].id)
 		}
+		tap()
 		askReload(`Installed ${done.length} plugin${done.length === 1 ? '' : 's'}. Reload to apply it.`)
 		return true
 	} catch (e) {

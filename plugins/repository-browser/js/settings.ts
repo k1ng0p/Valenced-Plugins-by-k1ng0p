@@ -1,5 +1,7 @@
 import { FormSwitch, SearchInput } from '@valenced/components'
 import { Design } from '@valenced/discord/design'
+import { ReactNativeSafeAreaContext } from '@valenced/externals/react-native-safe-area-context'
+import { ReactNavigationNative } from '@valenced/externals/react-navigation'
 import { React, ReactNative } from '@valenced/react'
 import { FeedSection, Notice, PluginCard, RepoAvatar, RepoBadges } from './components'
 import { openBulkInstallSheet, openPluginSheet } from './sheets'
@@ -33,6 +35,12 @@ import { ALERT_MODES, BUILT_IN_NOTE, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORT
 import type { AlertMode, AvailableUpdate, ListedPlugin, PluginKind, Repo, SortKey } from './shared'
 
 type Hit = { repo: Repo; plugin: ListedPlugin }
+
+// the navigation types aren't shipped with Valenced's externals, only the part used here
+type ScreenNavigation = {
+	isFocused(): boolean
+	addListener(type: 'beforeRemove', listener: (event: { data: { action: { type: string } }; preventDefault(): void }) => void): () => void
+}
 type Ctx = ReturnType<typeof useBrowser>
 
 // a switch flip stays visible until Valenced reports the new state
@@ -156,16 +164,30 @@ function useBrowser() {
 	}, [current, epoch])
 
 	const selecting = Object.keys(selection).length > 0
+	const navigation = React.useContext(ReactNavigationNative.NavigationContext) as ScreenNavigation | undefined
 
 	React.useEffect(() => {
 		if (!current && !selecting) return
 		const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+			// a plugin's own settings can sit on top while this screen stays mounted, back belongs to that screen then
+			if (navigation && !navigation.isFocused()) return false
 			if (selecting) setSelection({})
 			else showList()
 			return true
 		})
 		return () => subscription.remove()
-	}, [current, selecting])
+	}, [navigation, current, selecting])
+
+	// the back arrow and the system back can reach the screen before the handler above, so a repository is also closed here
+	React.useEffect(() => {
+		if (!current && !selecting) return
+		return navigation?.addListener('beforeRemove', event => {
+			if (event.data.action.type !== 'GO_BACK' && event.data.action.type !== 'POP') return
+			event.preventDefault()
+			if (selecting) setSelection({})
+			else showList()
+		})
+	}, [navigation, current, selecting])
 
 	React.useEffect(() => setLimit(PAGE_SIZE), [query, current, sort, kind, repoKind])
 
@@ -835,12 +857,13 @@ function RepoPage(b: Ctx, repo: Repo) {
 function SelectionBar(b: Ctx) {
 	const { View } = ReactNative
 	const { Button, Card, Stack, Text } = Design
+	const { bottom } = ReactNativeSafeAreaContext.useSafeAreaInsets()
 	if (!b.selecting) return null
 
 	const count = Object.keys(b.selection).length
 	return h(
 		View,
-		{ style: { paddingHorizontal: 12, paddingBottom: 12 } },
+		{ style: { paddingHorizontal: 12, paddingBottom: 12 + bottom } },
 		h(
 			Card,
 			{ border: 'strong', style: { padding: 12 } },
@@ -862,6 +885,8 @@ export function Browser() {
 	const { ScrollView, View } = ReactNative
 	const { SegmentedControl, SegmentedControlPages, Stack, useSegmentedControlState } = Design
 	const b = useBrowser()
+	const { bottom } = ReactNativeSafeAreaContext.useSafeAreaInsets()
+	const contentStyle = { padding: 16, paddingBottom: 16 + (b.selecting ? 0 : bottom) }
 	const [pageWidth, setPageWidth] = React.useState(0)
 	const active = Math.max(0, KINDS.findIndex(item => item.id === b.kind))
 
@@ -872,7 +897,7 @@ export function Browser() {
 	const items = KINDS.map(({ id, label }, index) => ({
 		id,
 		label: b.pings[id] ? `${label} \u2022` : label,
-		page: tabbed && Math.abs(index - active) <= 1 ? h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: { padding: 16 } }, MainPage(b, id))) : null,
+		page: tabbed && Math.abs(index - active) <= 1 ? h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: contentStyle }, MainPage(b, id))) : null,
 	}))
 
 	const tabs = useSegmentedControlState({
@@ -889,7 +914,7 @@ export function Browser() {
 		h(View, { style: { paddingHorizontal: 16, paddingTop: 16, gap: 12 } }, b.controls(), tabbed && h(SegmentedControl, { state: tabs })),
 		tabbed
 			? h(View, { style: { flex: 1 }, onLayout: (e: any) => setPageWidth(e.nativeEvent.layout.width) }, h(SegmentedControlPages, { state: tabs }))
-			: h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: { padding: 16 } }, b.current ? RepoPage(b, b.current) : SearchPage(b))),
+			: h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: contentStyle }, b.current ? RepoPage(b, b.current) : SearchPage(b))),
 		SelectionBar(b),
 	)
 }

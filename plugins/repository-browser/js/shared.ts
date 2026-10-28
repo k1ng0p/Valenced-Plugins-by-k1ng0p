@@ -97,6 +97,18 @@ export const COMMUNITY_REPO = 'https://community.valenced.app/'
 
 // comes with Valenced itself and can't be removed, so it is always listed, and always last
 export const BUILT_IN_REPO: Repo = { url: slash(COMMUNITY_REPO), source: 'https://github.com/Valenced/valenced-community-plugins', badges: ['Built in Repo'], builtIn: true }
+export type Note = { title?: string; text: string; level: 'info' | 'warning' | 'critical' }
+
+let hapticsOn = true
+export const setHaptics = (on: boolean) => {
+	hapticsOn = on
+}
+
+// Valenced has no haptics module, so this is a short vibration, and iOS ignores the length
+export function tap() {
+	if (hapticsOn && ReactNative.Platform.OS === 'android') ReactNative.Vibration.vibrate(12)
+}
+
 export const BUILT_IN_NOTE = 'This repository comes built in with Valenced. It is listed here only for tracking and for the dependencies other plugins need.'
 export const isBuiltIn = (url: string) => slash(url) === BUILT_IN_REPO.url
 

@@ -4,7 +4,7 @@ import { React, ReactNative } from '@valenced/react'
 import { cachedAvatar, catalog, discordUser, githubAvatar, newRepoCount, unreadCount, useStore } from './data'
 import { AVATAR_SIZE, ICON_INDENT, NOTICE, asset, h, icon, iconSlot, inform, isRemote } from './shared'
 import { PluginByline, WarningNote } from './sheets'
-import type { ListedPlugin, Listing, Repo } from './shared'
+import type { ListedPlugin, Listing, Note, Repo } from './shared'
 export type CardUpdate = { from: string; to: string; state: 'ready' | 'busy' | 'pending'; onPress: () => void }
 
 export function RepoAvatar({ repo, listing, epoch, person }: { repo: Repo; listing?: Listing; epoch: number; person?: boolean }) {
@@ -106,6 +106,17 @@ export function PluginCard(props: PluginCardProps) {
 				),
 			),
 		),
+	)
+}
+
+export function NoteBanner({ note }: { note: Note }) {
+	const { Card, Text } = Design
+	const color = note.level === 'critical' ? 'text-feedback-critical' : note.level === 'warning' ? 'text-feedback-warning' : undefined
+	return h(
+		Card,
+		{ border: 'strong', style: { paddingVertical: 14, paddingHorizontal: 16 } },
+		note.title ? h(Text, { variant: 'heading-md/semibold', color }, note.title) : null,
+		h(Text, { variant: 'text-sm/medium', color: color ?? 'text-muted', style: { marginTop: note.title ? 4 : 0 } }, note.text),
 	)
 }
 

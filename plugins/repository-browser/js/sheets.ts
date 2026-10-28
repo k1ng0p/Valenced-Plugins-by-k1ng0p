@@ -7,8 +7,8 @@ import { ReactNativeSafeAreaContext } from '@valenced/externals/react-native-saf
 import { parsePluginContributor } from '@valenced/plugins/utils'
 import { React, ReactNative } from '@valenced/react'
 import { lookupGeneratedIconComponent } from '@valenced/utils/discord'
-import { catalog, dependentsOf, listings, missingDependencies, openUserProfile } from './data'
-import { available, blocked, install, openPluginSettings, pendingReload, putRepos, readState, setHeld, toggle, uninstall, updatePlugins } from './valenced'
+import { catalog, dependentsOf, isLegacy, listings, missingDependencies, openUserProfile } from './data'
+import { available, blocked, checkInstall, install, openPluginSettings, pendingReload, putRepos, readState, setHeld, toggle, uninstall, updatePlugins } from './valenced'
 import type { BulkItem } from './valenced'
 import type { ValencedState } from './valenced'
 import { ICON_INDENT, asset, isBuiltIn, compatibilityWarning, copyToClipboard, fail, formatBytes, h, icon, iconSlot, native, reportError, slash } from './shared'
@@ -406,6 +406,7 @@ function PluginSheet({ repo: initialRepo, plugin, onChange }: SheetProps) {
 	const [listing, setListing] = React.useState<RepoListing | null>(null)
 	const [enabledNow, setEnabledNow] = React.useState<boolean | null>(null)
 	const [busy, setBusy] = React.useState(false)
+	const [blockReason, setBlockReason] = React.useState<string | null>(null)
 
 	const refresh = React.useCallback(
 		() =>
@@ -437,6 +438,19 @@ function PluginSheet({ repo: initialRepo, plugin, onChange }: SheetProps) {
 			.catch(reportError)
 	}, [state === null, repo.url])
 
+	// Valenced plans the install ahead of time, so a plugin that can't be installed says why before the button is tapped
+	React.useEffect(() => {
+		setBlockReason(null)
+		if (!state || installed || !entry?.enabled || isLegacy(plugin)) return
+		let cancelled = false
+		checkInstall(repo.url, plugin, ref).then(reason => {
+			if (!cancelled) setBlockReason(reason)
+		})
+		return () => {
+			cancelled = true
+		}
+	}, [state === null, !!installed, entry?.enabled, repo.url, ref])
+
 	const close = () => ActionSheetActionCreators.hideActionSheet(PLUGIN_SHEET)
 	const changed = () => {
 		refresh()
@@ -452,7 +466,7 @@ function PluginSheet({ repo: initialRepo, plugin, onChange }: SheetProps) {
 			: ((listing && versionOfChannel(listing, currentRef.channel)) ?? plugin.version ?? '')
 
 	const byline = h(PluginByline, { plugin, version: versionText ? `v${versionText}` : undefined })
-	const warning = [compatibilityWarning(plugin, state?.discord, blocked.get(id)?.text), ...missingDependencies(plugin, state?.installed)].filter(Boolean).join('\n') || undefined
+	const warning = [compatibilityWarning(plugin, state?.discord, blocked.get(id)?.text), ...missingDependencies(plugin, state?.installed), blockReason && `Can't be installed: ${blockReason}`].filter(Boolean).join('\n') || undefined
 
 	const switchOrInstall = installed
 		? h(FormSwitch, { value: enabled, disabled: reloadPending, onValueChange: (value: boolean) => toggle(id, value).then(done => done && (setEnabledNow(value), changed())) })
@@ -461,6 +475,7 @@ function PluginSheet({ repo: initialRepo, plugin, onChange }: SheetProps) {
 				text: entry?.enabled ? 'Install' : entry ? 'Enable repo' : 'Add repo',
 				icon: asset('DownloadIcon'),
 				loading: busy,
+				disabled: !!blockReason || isLegacy(plugin),
 				onPress: async () => {
 					setBusy(true)
 					try {
@@ -564,7 +579,7 @@ function PluginSheet({ repo: initialRepo, plugin, onChange }: SheetProps) {
 	const refRow = h(TableRow, {
 		icon: h(TableRowAssetIcon, { name: 'LocationIcon' }),
 		label: currentRef.type === 'channel' ? 'Channel' : 'Version',
-		subLabel: currentRef.type === 'channel' ? `${currentRef.channel} \u2022 v${versionText}` : `v${versionText}`,
+		subLabel: currentRef.type === 'channel' ? `${currentRef.channel} \u2022 v${versionText}` : `${source?.held ? 'Pinned \u2022 ' : ''}v${versionText}`,
 		arrow: !!repoUrl,
 		onPress: repoUrl
 			? () =>

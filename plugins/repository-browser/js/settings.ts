@@ -3,7 +3,7 @@ import { Design } from '@valenced/discord/design'
 import { ReactNativeSafeAreaContext } from '@valenced/externals/react-native-safe-area-context'
 import { ReactNavigationNative } from '@valenced/externals/react-navigation'
 import { React, ReactNative } from '@valenced/react'
-import { FeedSection, Notice, PluginCard, RepoAvatar, RepoBadges } from './components'
+import { FeedSection, NoteBanner, Notice, PluginCard, RepoAvatar, RepoBadges } from './components'
 import { openBulkInstallSheet, openPluginSheet } from './sheets'
 import type { CardUpdate } from './components'
 import {
@@ -17,6 +17,7 @@ import {
 	dismissRepo,
 	freshAvatarEpoch,
 	listings,
+	isLegacy,
 	missingDependencies,
 	openUserProfile,
 	parseAuthor,
@@ -31,7 +32,7 @@ import type { SeenEntry } from './data'
 import { THEMES_SETTINGS, THEME_SUPPORT, available, blocked, install, installMany, openPluginSettings, pendingReload, putRepos, readState, toggle, uninstall, updatePlugins } from './valenced'
 import type { BulkItem } from './valenced'
 import type { ValencedState } from './valenced'
-import { ALERT_MODES, BUILT_IN_NOTE, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
+import { ALERT_MODES, BUILT_IN_NOTE, setHaptics, tap, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
 import type { AlertMode, AvailableUpdate, ListedPlugin, PluginKind, Repo, SortKey } from './shared'
 
 type Hit = { repo: Repo; plugin: ListedPlugin }
@@ -380,6 +381,7 @@ function useBrowser() {
 					size: 'sm',
 					icon: asset('DownloadIcon'),
 					loading: installing === plugin.id,
+					disabled: isLegacy(plugin),
 					onPress: () => installPlugin(repo, plugin),
 				}),
 			]
@@ -396,13 +398,15 @@ function useBrowser() {
 		]
 	}
 
-	const toggleSelect = (repo: Repo, plugin: ListedPlugin) =>
+	const toggleSelect = (repo: Repo, plugin: ListedPlugin) => {
+		tap()
 		setSelection(current => {
 			const next = { ...current }
 			if (next[plugin.id]?.repo.url === repo.url) delete next[plugin.id]
 			else next[plugin.id] = { repo, plugin }
 			return next
 		})
+	}
 
 	const installSelected = async () => {
 		if (bulkBusy) return
@@ -437,7 +441,8 @@ function useBrowser() {
 
 	const pluginCard = (repo: Repo, plugin: ListedPlugin, fromSearch = false) => {
 		const installed = state?.installed.has(plugin.id) ?? false
-		const version = state?.installed.get(plugin.id)?.version ?? plugin.version
+		const installedInfo = state?.installed.get(plugin.id)
+		const version = installedInfo ? `${installedInfo.version}${installedInfo.source?.held ? ' \u2022 Pinned' : ''}` : plugin.version
 		const origin = fromSearch ? `${kindInfoOf(kindOf(plugin, repo.kinds)).label} from ${repoName(repo)}${addedRepo(repo.url)?.enabled ? '' : ' \u2022 repository not added'}` : undefined
 		const selectable = selecting && !installed
 		return h(PluginCard, {
@@ -451,7 +456,7 @@ function useBrowser() {
 			selectable,
 			selected: selection[plugin.id]?.repo.url === repo.url,
 			onPress: selectable ? () => toggleSelect(repo, plugin) : () => openPluginSheet({ repo, plugin, onChange: syncState }),
-			onLongPress: installed ? undefined : () => toggleSelect(repo, plugin),
+			onLongPress: installed || isLegacy(plugin) ? undefined : () => toggleSelect(repo, plugin),
 		})
 	}
 
@@ -520,6 +525,13 @@ function useBrowser() {
 		selection,
 		selecting,
 		bulkBusy,
+		note: data?.remote?.note ?? null,
+		haptics: data?.haptics !== false,
+		changeHaptics: (value: boolean) => {
+			setHaptics(value)
+			save({ haptics: value })
+			tap()
+		},
 		setSelection,
 		installSelected,
 		updatingIds,
@@ -694,7 +706,7 @@ function emptyList(b: Ctx) {
 }
 
 function MainPage(b: Ctx, tab: PluginKind) {
-	const { TableRow, TableRowGroup, Text } = Design
+	const { TableRow, TableRowGroup, TableSwitchRow, Text } = Design
 	const { sort } = b
 
 	// a repository stays visible while it loads or fails so it can be retried
@@ -710,6 +722,7 @@ function MainPage(b: Ctx, tab: PluginKind) {
 
 	return [
 		h(Notice, { key: 'notice' }),
+		b.note ? h(NoteBanner, { key: 'note', note: b.note }) : null,
 		b.sortNote(repos.map(b.repoRank)),
 		updatesSection(b, tab),
 		feed(b, tab, 'news', `New ${kindInfoOf(tab).plural}`),
@@ -724,6 +737,11 @@ function MainPage(b: Ctx, tab: PluginKind) {
 					h(TableRow, { label: `Recent problems (${recentProblems().length})`, subLabel: 'Copy them to share when something breaks', arrow: true, onPress: () => copyToClipboard(problemsText()) }),
 				)
 			: null,
+		h(
+			TableRowGroup,
+			{ key: 'preferences', title: 'Preferences' },
+			h(TableSwitchRow, { label: 'Haptic feedback', subLabel: 'A short vibration when selecting, installing and updating (Android)', value: b.haptics, onValueChange: b.changeHaptics }),
+		),
 	]
 }
 
@@ -846,6 +864,7 @@ function RepoPage(b: Ctx, repo: Repo) {
 			{ key: 'plugins', spacing: 12 },
 			h(Text, { variant: 'text-md/semibold', color: 'text-muted' }, `This repository comes with ${pluralKind(tab, b.countOf(repo, tab))}`),
 			!entry?.enabled && h(Text, { key: 'hint', variant: 'text-sm/medium', color: 'text-muted' }, 'Add this repository to Valenced to install its plugins.'),
+			visible.length > 1 && !b.selecting && h(Text, { key: 'tip', variant: 'text-sm/medium', color: 'text-muted' }, 'Tip: Tap and Hold on any plugin to select and install Bulk plugins with single click'),
 			b.sortNote(visible.map(item => b.pluginRank(item.repo, item.plugin))),
 			b.needle && !visible.length && b.noMatches(),
 			...visible.slice(0, b.limit).map(item => b.pluginCard(item.repo, item.plugin)),

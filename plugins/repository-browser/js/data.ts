@@ -3,9 +3,9 @@ import { LoggerModuleId } from '@valenced/discord/common/logger'
 import { Stores, withStoreName } from '@valenced/discord/flux'
 import { filters, lookupModule } from '@valenced/modules/finders'
 import { ReactNative } from '@valenced/react'
-import { available, refreshAvailable } from './valenced'
-import { AVATAR_TTL, BUILT_IN_REPO, DAY, KINDS, MAX_REQUESTS, RECHECK_AFTER_FOCUS, REMOTE_LIST, asObject, errorMessage, hostOf, isRemote, kindOf, clearProblems, logProblem, reportError, slash, sleep } from './shared'
-import type { AlertMode, ListedPlugin, Listing, PluginKind, Repo } from './shared'
+import { available, providedIds, refreshAvailable } from './valenced'
+import { AVATAR_TTL, BUILT_IN_REPO, DAY, KINDS, MAX_REQUESTS, RECHECK_AFTER_FOCUS, REMOTE_LIST, asObject, errorMessage, hostOf, isRemote, kindOf, clearProblems, logProblem, reportError, setHaptics, slash, sleep } from './shared'
+import type { AlertMode, ListedPlugin, Listing, Note, PluginKind, Repo } from './shared'
 
 export type SeenEntry = {
 	sig: string
@@ -20,12 +20,13 @@ export type StoreData = {
 	seen: Record<string, SeenEntry>
 	ack: number
 	snaps: Record<string, { at: number; data: Listing }>
-	remote: { repos: Repo[] } | null
+	remote: { repos: Repo[]; note?: Note | null } | null
 	known: string[] | null
 	newRepos: Record<string, number>
 	updatesSeen: Record<string, Record<string, number>> | null
 	alerts: Record<string, AlertMode>
 	muted: Record<string, PluginKind[]>
+	haptics?: boolean
 }
 
 type JsonStore = {
@@ -463,13 +464,26 @@ export function parseRepoList(json: any): Repo[] | null {
 	return repos.length ? repos : null
 }
 
+// a note from the repository list shows on the main page, so it can be set or removed without a plugin update
+function parseNote(value: unknown): Note | null {
+	const raw = typeof value === 'string' ? { text: value } : asObject(value)
+	const text = typeof raw.text === 'string' ? raw.text.trim().slice(0, 600) : ''
+	if (!text) return null
+	const title = typeof raw.title === 'string' ? raw.title.trim().slice(0, 80) : ''
+	return { ...(title && { title }), text, level: raw.level === 'warning' || raw.level === 'critical' ? raw.level : 'info' }
+}
+
 async function fetchRepoList() {
 	for (let attempt = 0; attempt < 2; attempt++) {
 		const controller = new AbortController()
 		const timer = setTimeout(() => controller.abort(), 10000)
 		try {
 			const res = await fetch(`${REMOTE_LIST}?t=${Date.now()}`, { signal: controller.signal })
-			if (res.ok) return parseRepoList(await res.json())
+			if (res.ok) {
+				const json = await res.json()
+				const repos = parseRepoList(json)
+				return repos && { repos, note: parseNote(json?.note) }
+			}
 			if (res.status < 500) {
 				reportError(new Error(`HTTP ${res.status}`), 'load the repository list')
 				return null
@@ -486,8 +500,9 @@ async function fetchRepoList() {
 }
 
 async function refreshCatalog() {
-	const next = await fetchRepoList()
-	if (!next) return
+	const fetched = await fetchRepoList()
+	if (!fetched) return
+	const next = fetched.repos
 
 	catalog.splice(0, catalog.length, ...withBuiltIn(next))
 	await update(data => {
@@ -506,7 +521,7 @@ async function refreshCatalog() {
 		const keep = (all: Record<string, any>) => Object.fromEntries(Object.entries(all).filter(([url]) => urls.has(url)))
 		for (const url of Object.keys(newRepos)) if (!urls.has(url)) delete newRepos[url]
 
-		return { remote: { repos: next }, known: [...known], newRepos, seen: keep(data.seen), snaps: keep(data.snaps) }
+		return { remote: { repos: next, note: fetched.note }, known: [...known], newRepos, seen: keep(data.seen), snaps: keep(data.snaps) }
 	})
 }
 
@@ -600,6 +615,7 @@ export async function checkUpdates(only?: string[], onEach?: () => void) {
 export function restore() {
 	ready = whenLoaded().then(() => {
 		const data = readStore()
+		setHaptics(data.haptics !== false)
 		catalog.splice(0, catalog.length, ...withBuiltIn(parseRepoList(data.remote?.repos) ?? []))
 		for (const [url, snap] of Object.entries<any>(data.snaps)) {
 			if (catalog.some(repo => repo.url === url)) listings.set(url, { ...cleanListing(snap?.data, url), saved: snap?.at })
@@ -608,15 +624,23 @@ export function restore() {
 	})
 }
 
+// a plugin that needs a Revenge Next API was never built for Valenced
+export const isLegacy = (plugin: ListedPlugin) => (plugin.requires ?? []).some(entry => !entry.endsWith('(optional)') && entry.startsWith('revenge.'))
+
 // requirements are listed as "id 1.2.0" or "id 1.2.0 (optional)"
-// what a plugin needs that nothing installed or listed can give, ids Valenced itself provides are left out
+// what a plugin needs that nothing installed or added to Valenced can give, ids Valenced itself provides are left out
 export function missingDependencies(plugin: ListedPlugin, installed?: Map<string, unknown>) {
 	const missing: string[] = []
 	for (const entry of plugin.requires ?? []) {
 		if (entry.endsWith('(optional)')) continue
 		const id = entry.split(' ')[0]
-		if (id.startsWith('valenced.') || id === 'discord' || installed?.has(id)) continue
-		if (!catalog.some(repo => listings.get(repo.url)?.plugins.some(listed => listed.id === id))) missing.push(`Needs ${id}, which isn't in any listed repository`)
+		if (id.startsWith('revenge.')) {
+			missing.push(`Built for Revenge Next (needs ${id}), it can't run on Valenced`)
+			continue
+		}
+		if (id.startsWith('valenced.') || id === 'discord' || installed?.has(id) || providedIds.has(id)) continue
+		const offeredBy = catalog.find(repo => listings.get(repo.url)?.plugins.some(listed => listed.id === id))
+		missing.push(offeredBy ? `Needs ${id}, add ${listings.get(offeredBy.url)?.name ?? offeredBy.url} to Valenced first` : `Needs ${id}, which isn't in any added or listed repository`)
 	}
 	return missing
 }

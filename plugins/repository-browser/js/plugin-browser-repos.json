@@ -31,13 +31,19 @@
       "badges": ["Trusted", "Utility"]
     },
     {
+      "url": "https://valenced.tralwdwd.dev/",
+      "source": "https://github.com/tralwdwd/valenced-plugins",
+      "discord": "1278723517436788897",
+      "badges": ["Trusted", "Utility"]
+    },
+    {
       "url": "https://otkusteyler.github.io/btmc727-s-Valenced-plugins-/",
       "source": "https://github.com/OTKUSteyler/btmc727-s-Valenced-plugins-",
       "discord": "554071670143451176",
       "badges": ["Trusted", "Ports"]
     },
     {
-      "url": "https://next.jarviscli.dev/",
+      "url": "https://val.is-your.app/",
       "source": "https://code.is-your.app/SheWhoReignsSupreme/revenge-next-plugs",
       "discord": "1356936317501571214",
       "badges": ["Utility", "Themes"]

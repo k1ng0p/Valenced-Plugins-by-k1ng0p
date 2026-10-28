@@ -86,6 +86,7 @@ interface RelationshipStore {
 
 interface UserStore {
 	getUser(id: string): { globalName?: string; username?: string } | undefined
+	getCurrentUser(): { id: string } | undefined
 }
 
 interface MessageActions {
@@ -261,6 +262,16 @@ export default plugin<{ jsonStorage: Settings }>({
 
 		const isFriend = (userId: string) =>
 			!!refs.friends?.getFriendIDs().includes(userId)
+
+		// Own status and bio open their editors on tap, so they get no menu.
+		const isSelf = (userId: string) =>
+			(Stores.UserStore as unknown as UserStore).getCurrentUser()?.id === userId
+
+		// Your own status pill gets an edit prop and opens the status editor on tap.
+		const isEditable = (props: object) =>
+			Object.entries(props).some(
+				([key, value]) => /^(on)?edit/i.test(key) && value,
+			)
 
 		const nameOf = (userId: string) => {
 			const user = (Stores.UserStore as unknown as UserStore).getUser(userId)
@@ -441,7 +452,14 @@ export default plugin<{ jsonStorage: Settings }>({
 			const reply = !!userId && isFriend(userId)
 			const copy = enabled('copy')
 
-			if (!isValidElement(el) || !activity || !(reply || copy)) return el
+			if (
+				!isValidElement(el) ||
+				!activity ||
+				isEditable(props) ||
+				(userId && isSelf(userId)) ||
+				!(reply || copy)
+			)
+				return el
 
 			return (
 				<TargetMenu
@@ -467,7 +485,13 @@ export default plugin<{ jsonStorage: Settings }>({
 			const reply = !!text && !!userId && enabled('bio') && isFriend(userId)
 			const copy = enabled('copy')
 
-			if (!isValidElement(el) || !bio || !(reply || copy)) return el
+			if (
+				!isValidElement(el) ||
+				!bio ||
+				(userId && isSelf(userId)) ||
+				!(reply || copy)
+			)
+				return el
 
 			return (
 				<TargetMenu

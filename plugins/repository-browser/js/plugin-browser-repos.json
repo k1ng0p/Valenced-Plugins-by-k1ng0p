@@ -31,6 +31,12 @@
       "badges": ["Trusted", "Utility"]
     },
     {
+      "url": "https://loki-vtx.github.io/Valnced-Plugins/",
+      "source": "https://github.com/Loki-vtx/Valnced-Plugins",
+      "discord": "918437723755384832",
+      "badges": ["Trusted", "Ports"]
+    },
+    {
       "url": "https://valenced.tralwdwd.dev/",
       "source": "https://github.com/tralwdwd/valenced-plugins",
       "discord": "1278723517436788897",

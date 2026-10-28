@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "name": "Valenced Plugins by k1ng_op",
+  "name": "k1ng_op Plugins",
   "description": "Stuff I’ve made and ported for Valenced",
   "plugins": {
     "k1ngop-localeditdelete": {
@@ -248,7 +248,7 @@
       "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
       "icon": "ic_browse_channel",
       "channels": {
-        "latest": "1.1.1"
+        "latest": "1.1.5"
       },
       "versions": {
         "1.0.0": {
@@ -294,6 +294,19 @@
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.repository-browser@1.1.1.zip",
           "sha256": "5e6801c8e6bd71d2184776df4ccd0dc321e4010cbabbe2c571f6524fcab345f9",
           "size": 24083,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.1.5": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.repository-browser@1.1.5.zip",
+          "sha256": "e57086c8830bee0ee65eccefd245fd096b366728f6803294b60e1a077cf86f2a",
+          "size": 24911,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"

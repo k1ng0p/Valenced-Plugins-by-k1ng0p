@@ -1,7 +1,6 @@
 import {
 	ActionSheetActionCreators,
 	ActionSheetActionCreatorsModuleId,
-	AlertActionCreators,
 	ToastActionCreators,
 } from '@valenced/discord/actions'
 import { Design } from '@valenced/discord/design'
@@ -17,7 +16,7 @@ import { instead } from '@valenced/patcher'
 import { lookupGeneratedIconComponent } from '@valenced/utils/discord'
 import { cloneElement, createElement, isValidElement } from 'react'
 import { StyleSheet, View } from 'react-native'
-import ReplyModal from './reply-modal'
+import ReplySheet from './reply-sheet'
 import SettingsComponent from './settings'
 import type { ComponentProps, FC, ReactElement } from 'react'
 import type { StyleProp, ViewStyle } from 'react-native'
@@ -316,18 +315,18 @@ export default plugin<{ jsonStorage: Settings }>({
 		}
 
 		function openReply(target: Target) {
-			AlertActionCreators.openAlert(
+			ActionSheetActionCreators.openLazy(
+				Promise.resolve({ default: ReplySheet }),
 				ALERT_KEY,
-				<ReplyModal
-					name={nameOf(target.userId)}
-					subject={target.subject}
-					quote={target.text}
-					onCancel={() => AlertActionCreators.dismissAlert(ALERT_KEY)}
-					onSend={reply => {
-						AlertActionCreators.dismissAlert(ALERT_KEY)
+				{
+					name: nameOf(target.userId),
+					subject: target.subject,
+					quote: target.text,
+					onSend: reply => {
+						ActionSheetActionCreators.hideActionSheet(ALERT_KEY)
 						send(target, 'reply', reply)
-					}}
-				/>,
+					},
+				},
 			)
 		}
 

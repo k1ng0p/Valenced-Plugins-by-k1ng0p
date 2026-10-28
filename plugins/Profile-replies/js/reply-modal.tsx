@@ -1,51 +1,55 @@
 import { Design } from '@valenced/discord/design'
 import { useState } from 'react'
+import { StyleSheet, View } from 'react-native'
 
-interface ReplyModalProps {
+interface ReplySheetProps {
 	name: string
 	subject: string
 	quote: string
 	onSend(text: string): void
-	onCancel(): void
 }
 
-export default function ReplyModal({
+const styles = StyleSheet.create({
+	body: {
+		gap: 16,
+		paddingBottom: 16,
+	},
+})
+
+export default function ReplySheet({
 	name,
 	subject,
 	quote,
 	onSend,
-	onCancel,
-}: ReplyModalProps) {
+}: ReplySheetProps) {
 	const [text, setText] = useState('')
-	const { AlertModal, AlertActionButton, TextInput } = Design
+	const { ActionSheet, BottomSheetTitleHeader, Button, TextInput } = Design
 
 	return (
-		<AlertModal
-			title={`Reply to ${name}'s ${subject}`}
-			content={quote}
-			extraContent={
+		<ActionSheet
+			keyboardShouldPersistTaps="handled"
+			header={
+				<BottomSheetTitleHeader
+					title={`Reply to ${name}'s ${subject}`}
+					subtitle={quote}
+				/>
+			}
+		>
+			<View style={styles.body}>
 				<TextInput
 					autoFocus
 					placeholder="Your reply"
 					value={text}
 					onChange={setText}
 				/>
-			}
-			actions={
-				<>
-					<AlertActionButton
-						text="Send"
-						variant="primary"
-						disabled={!text.trim()}
-						onPress={() => onSend(text.trim())}
-					/>
-					<AlertActionButton
-						text="Cancel"
-						variant="secondary"
-						onPress={onCancel}
-					/>
-				</>
-			}
-		/>
+				<Button
+					text="Send"
+					variant="primary"
+					size="lg"
+					disabled={!text.trim()}
+					onPress={() => onSend(text.trim())}
+				/>
+			</View>
+		</ActionSheet>
 	)
 }

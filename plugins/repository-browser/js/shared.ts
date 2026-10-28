@@ -112,6 +112,11 @@ export function friendlyError(err: string) {
 	if (/json|unexpected (token|end|character)/i.test(err)) return 'The repository sent a broken index.json'
 	if (/not a valenced repository/i.test(err)) return "This address isn't a Valenced repository, it has no plugin list"
 	if (/too large/i.test(err)) return 'The repository is too large to load safely'
+	const size = err.match(/^Artifact for \S+ is (\d+) bytes; the plan says (\d+)/i)
+	if (size) {
+		const gap = Math.abs(Number(size[1]) - Number(size[2]))
+		return `The downloaded file is ${gap} bytes ${Number(size[1]) > Number(size[2]) ? 'larger' : 'smaller'} than the repository's index says. Valenced may be working from an old copy of the index: refresh the repository and try again. If it still fails, the repository has to republish its index.json`
+	}
 	const status = err.match(/^HTTP (\d{3})/)?.[1]
 	if (status === '404') return 'Not found (404). The repository may have moved or been removed'
 	if (status === '401' || status === '403') return `Access was refused (${status}). The repository may be private`
@@ -131,6 +136,15 @@ export function explainError(e: unknown) {
 	})
 	return lines.length ? `Needs ${lines.join('; ')}.` : friendlyError(errorMessage(e).split('\n')[0])
 }
+// what failed, where, and the error as Valenced reported it, with a likely cause when one is known
+export function describeError(e: unknown, info: string[] = []) {
+	const raw = errorMessage(e).split('\n')[0]
+	const explained = explainError(e)
+	const dependencyProblems = !!(e as { details?: { problems?: unknown[] } } | null)?.details?.problems?.length
+	const body = dependencyProblems || explained === raw ? explained : `${raw}\n\n${explained}`
+	return [info.join('\n'), body].filter(Boolean).join('\n\n')
+}
+
 export function formatBytes(bytes: number) {
 	if (bytes < 1024) return `${bytes} B`
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -175,17 +189,33 @@ function record(context: string, error: unknown) {
 // failures that are expected now and then (offline, timeouts) are kept for diagnostics only
 export const logProblem = (context: string, error: unknown) => void record(context, error)
 
+// a problem that has gone away shouldn't keep showing up in diagnostics
+export function clearProblems(context: string) {
+	for (let index = problems.length - 1; index >= 0; index--) if (problems[index].context === context) problems.splice(index, 1)
+}
+
+// the install or enable was refused by Valenced itself (bad artifact, missing dependency), nothing is broken in this plugin
+const fromHost = (error: unknown) => !!(error as { host?: boolean } | null)?.host
+
+export const WATERMARK = "Logged by k1ng_op's Repository Browser"
+
+// logs get copied around, this says which tool wrote them
+export function watermark(error: unknown, context = '') {
+	const wrapped = new Error(`${context ? `${context}: ` : ''}${errorMessage(error)}\n${WATERMARK}`)
+	if (error instanceof Error && error.stack) wrapped.stack = error.stack
+	return wrapped
+}
+
 // every error comes with what was being done, and one that keeps coming back is only sent on once
 export function reportError(error: unknown, context = '') {
-	if (!record(context, error)) return
-	if (!context) return reporter(error)
-	const wrapped = new Error(`${context}: ${errorMessage(error)}`)
-	if (error instanceof Error && error.stack) wrapped.stack = error.stack
-	reporter(wrapped)
+	if (!record(context, error) || fromHost(error)) return
+	reporter(watermark(error, context))
 }
 
 export function problemsText() {
-	return problems.map(item => `${new Date(item.at).toISOString()} ${item.context || 'error'}: ${item.message}${item.count > 1 ? ` (x${item.count})` : ''}`).join('\n')
+	if (!problems.length) return ''
+	const lines = problems.map(item => `${new Date(item.at).toISOString()} ${item.context || 'error'}: ${item.message}${item.count > 1 ? ` (x${item.count})` : ''}`)
+	return [...lines, '', WATERMARK].join('\n')
 }
 
 export function copyToClipboard(text: string) {
@@ -209,7 +239,7 @@ export async function native(name: string, args: unknown[] = []) {
 	if (keys.length === 1 && keys[0] === 'error') {
 		wrapped = true
 		const { message, code, details } = reply.error ?? {}
-		throw Object.assign(new Error(message ?? code ?? 'Unknown error'), { code, details })
+		throw Object.assign(new Error(message ?? code ?? 'Unknown error'), { code, details, host: true })
 	}
 	return reply
 }
@@ -247,10 +277,11 @@ export const inform = (title: string, text: string) => modal(title, text, Button
 export const showError = (e: unknown) => inform('Plugin Browser', explainError(e))
 
 // action reads as "install Cabin", it names the dialog and says what the log entry was about
-export function fail(e: unknown, action = '') {
+export function fail(e: unknown, action = '', info: string[] = []) {
 	reportError(e, action)
-	const details = [action, errorMessage(e), (e as { stack?: string } | null)?.stack].filter(Boolean).join('\n')
-	modal(action ? `Couldn't ${action}` : 'Plugin Browser', explainError(e), Button => [
+	const stack = fromHost(e) ? undefined : (e as { stack?: string } | null)?.stack
+	const details = [action, ...info, errorMessage(e), stack, WATERMARK].filter(Boolean).join('\n')
+	modal(action ? `Couldn't ${action}` : 'Plugin Browser', describeError(e, info), Button => [
 		h(Button, { key: 'ok', text: 'OK', variant: 'secondary' }),
 		h(Button, { key: 'copy', text: 'Copy details', variant: 'tertiary', onPress: () => copyToClipboard(details) }),
 	])

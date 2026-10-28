@@ -4,7 +4,7 @@
 	"name": "Plugin Browser",
 	"description": "Browse third-party repositories, see what they offer, and add them to Valenced.",
 	"author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"icon": "ic_browse_channel",
 	"dependencies": {
 		"valenced.api": {

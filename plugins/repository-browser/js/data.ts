@@ -4,7 +4,7 @@ import { Stores, withStoreName } from '@valenced/discord/flux'
 import { filters, lookupModule } from '@valenced/modules/finders'
 import { ReactNative } from '@valenced/react'
 import { available, refreshAvailable } from './valenced'
-import { AVATAR_TTL, BUILT_IN_REPO, DAY, KINDS, MAX_REQUESTS, RECHECK_AFTER_FOCUS, REMOTE_LIST, asObject, errorMessage, hostOf, isRemote, kindOf, logProblem, reportError, slash, sleep } from './shared'
+import { AVATAR_TTL, BUILT_IN_REPO, DAY, KINDS, MAX_REQUESTS, RECHECK_AFTER_FOCUS, REMOTE_LIST, asObject, errorMessage, hostOf, isRemote, kindOf, clearProblems, logProblem, reportError, slash, sleep } from './shared'
 import type { AlertMode, ListedPlugin, Listing, PluginKind, Repo } from './shared'
 
 export type SeenEntry = {
@@ -411,6 +411,7 @@ export function load(url: string) {
 		.then(() => fetchRepo(url))
 		.then(json => {
 			const fresh = toListing(url, json)
+			clearProblems(`load ${url}`)
 			const previous = listings.get(url)
 			// one empty reply from a repository that had plugins is more likely an outage than a cleanup
 			if (!fresh.plugins.length && previous?.plugins.length && !previous.err) listings.set(url, { ...previous, stale: 'Repository sent an empty list' })

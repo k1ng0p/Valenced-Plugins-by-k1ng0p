@@ -1,6 +1,6 @@
 import { RootNavigationRef } from '@valenced/discord/modules/main_tabs_v2'
 import { formatVersion } from '@valenced/plugins/utils'
-import { BUILT_IN_REPO, askReload, asObject, confirm, errorMessage, fail, logProblem, native, reportError, showError, slash, usesEnvelope } from './shared'
+import { BUILT_IN_REPO, askReload, asObject, clearProblems, confirm, errorMessage, fail, logProblem, native, reportError, showError, slash, usesEnvelope } from './shared'
 import type { AvailableUpdate, ListedPlugin, PluginRef, Repo, ValencedRepo } from './shared'
 export type PendingUpdate = { id: string; name: string; installed: string; available: string; channel: string }
 export type ValencedState = Awaited<ReturnType<typeof readState>>
@@ -59,7 +59,10 @@ export async function refreshAvailable(catalog: Repo[]) {
 	for (let start = 0; start < active.length; start += REFRESH_BATCH) {
 		await Promise.all(
 			active.slice(start, start + REFRESH_BATCH).map(repo =>
-				native('valenced.plugins.repos.refresh', [repo.url]).catch(error => logProblem(`refresh ${repo.url}`, error)),
+				native('valenced.plugins.repos.refresh', [repo.url]).then(
+					() => clearProblems(`refresh ${repo.url}`),
+					error => logProblem(`refresh ${repo.url}`, error),
+				),
 			),
 		)
 	}
@@ -164,7 +167,7 @@ export async function uninstall(plugin: ListedPlugin, dependents: string[] = [])
 		askReload('Uninstalled. Reload to apply it.')
 		return true
 	} catch (e) {
-		fail(e, `uninstall ${plugin.name}`)
+		fail(e, `uninstall ${plugin.name}`, [`${plugin.name} (${plugin.id})`])
 		return false
 	}
 }
@@ -199,7 +202,7 @@ export async function install(repoUrl: string, plugin: ListedPlugin, ref?: Plugi
 		if (result?.pending?.length) askReload('Installed. Reload to apply it.')
 		return true
 	} catch (e) {
-		fail(e, `install ${plugin.name}`)
+		fail(e, `install ${plugin.name}`, [`${plugin.name} (${plugin.id}${plugin.version ? `@${plugin.version}` : ''})`, `Repository: ${repoUrl}`])
 		return false
 	}
 }

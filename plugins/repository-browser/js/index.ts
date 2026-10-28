@@ -3,7 +3,7 @@ import { ReactNative } from '@valenced/react'
 import { RepoCount } from './components'
 import { bindStore, checkedRecently, checkUpdates, restore } from './data'
 import { Browser } from './settings'
-import { KEY, POLL_INTERVAL, bindReporter, icon, reportError } from './shared'
+import { KEY, POLL_INTERVAL, bindReporter, icon, reportError, watermark } from './shared'
 
 export default plugin({
 	jsonStorage: { load: true, default: { seen: {}, ack: 0, snaps: {}, remote: null, known: null, newRepos: {}, updatesSeen: null, alerts: {}, muted: {} } },
@@ -81,7 +81,7 @@ export default plugin({
 				settings.refreshSettings()
 			})
 		} catch (e) {
-			plugin.reportError(e)
+			plugin.reportError(watermark(e))
 		}
 	},
 })

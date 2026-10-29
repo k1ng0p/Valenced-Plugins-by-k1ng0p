@@ -43,6 +43,18 @@
       "badges": ["Trusted", "Utility"]
     },
     {
+      "url": "https://dxckie-cell.github.io/valenced-plugins/",
+      "source": "https://github.com/dxckie-cell/valenced-plugins",
+      "discord": "772390964471791630",
+      "badges": ["Utility", "Ports"]
+    },
+    {
+      "url": "https://noreplyui5.github.io/valenced-plugin/",
+      "source": "https://github.com/NoReplyUI5/valenced-plugin",
+      "discord": "1053918356375351386",
+      "badges": ["Trusted", "Ports"]
+    },
+    {
       "url": "https://yumistra.github.io/Freestyle-Valenced",
       "source": "https://github.com/Yumistra/Freestyle-Valenced",
       "discord": "1203667124724170752",
@@ -59,6 +71,12 @@
       "source": "https://github.com/OTKUSteyler/btmc727-s-Valenced-plugins-",
       "discord": "554071670143451176",
       "badges": ["Trusted", "Ports"]
+    },
+     {
+      "url": "https://marklong0467.github.io/EskimoPlugins/",
+      "source": "https://github.com/MarkLong0467/EskimoPlugins",
+      "discord": "1096566768421580912",
+      "badges": ["Utility"]
     },
     {
       "url": "https://val.is-your.app/",

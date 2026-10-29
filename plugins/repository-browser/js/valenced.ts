@@ -315,6 +315,26 @@ export async function toggle(id: string, on: boolean) {
 
 export type BulkItem = { id: string; name: string; repo: string; repoName: string; version?: string; size?: number; description?: string; icon?: string }
 
+export async function uninstallMany(items: { id: string; name: string }[]) {
+	const plural = items.length === 1 ? '' : 's'
+	const done: string[] = []
+	try {
+		for (const item of items) {
+			await native('valenced.plugins.setEnabled', [item.id, false, false]).catch(() => {})
+			await native('valenced.plugins.uninstall', [item.id])
+			done.push(item.id)
+		}
+		tap()
+		askReload(`Uninstalled ${done.length} plugin${plural}. Reload to apply it.`)
+		return true
+	} catch (e) {
+		reportError(e, 'uninstall plugins')
+		if (done.length) askReload(`Uninstalled ${done.length} of ${items.length}. ${errorMessage(e).split('\n')[0]}\nReload to apply the ones that worked.`)
+		else showError(e)
+		return false
+	}
+}
+
 export async function installMany(items: BulkItem[]) {
 	const done: string[] = []
 	try {

@@ -615,12 +615,12 @@ function PluginSheet({ repo: initialRepo, plugin, onChange }: SheetProps) {
 					: null,
 				h(TableSwitchRow, {
 					icon: h(TableRowAssetIcon, { IconComponent: lookupGeneratedIconComponent('RefreshIcon') }),
-					label: 'Allow updates',
-					subLabel: source?.held ? h(Text, { color: 'text-feedback-critical', variant: 'text-xs/medium' }, `Other plugins won't be able to update if they need a newer version of ${name}`) : undefined,
-					value: !source?.held,
+					label: 'Pin version',
+					subLabel: source?.held ? h(Text, { color: 'text-feedback-critical', variant: 'text-xs/medium' }, `Other plugins won't be able to update if they need a newer version of ${name}`) : `Stay on v${versionText} and skip updates`,
+					value: !!source?.held,
 					disabled: !source,
 					onValueChange: (value: boolean) => {
-						setHeld(id, !value)
+						setHeld(id, value)
 							.then(changed)
 							.catch(fail)
 					},
@@ -652,9 +652,9 @@ export function openPluginSheet(props: SheetProps) {
 	ActionSheetActionCreators.openLazy(Promise.resolve({ default: PluginSheet }), PLUGIN_SHEET, props)
 }
 
-type BulkProps = { items: BulkItem[]; missing: string[]; onResult: (confirmed: boolean) => void }
+type BulkProps = { items: BulkItem[]; missing: string[]; uninstall?: boolean; warning?: string; onResult: (confirmed: boolean) => void }
 
-function BulkInstallSheet({ items, missing, onResult }: BulkProps) {
+function BulkInstallSheet({ items, missing, uninstall, warning, onResult }: BulkProps) {
 	const { View } = ReactNative
 	const { BottomSheet, Button, TableRow, TableRowGroup, Text } = Design
 	const settled = React.useRef(false)
@@ -674,14 +674,14 @@ function BulkInstallSheet({ items, missing, onResult }: BulkProps) {
 	const header = h(
 		View,
 		{ style: { gap: 12, marginBottom: 8 } },
-		h(SheetHeader, { title: `Install ${pluralize(items.length, 'plugin')}?` }),
+		h(SheetHeader, { title: `${uninstall ? 'Uninstall' : 'Install'} ${pluralize(items.length, 'plugin')}?` }),
 		h(
 			View,
 			{ style: { marginHorizontal: 16, gap: 8 } },
 			h(Button, {
-				text: 'Confirm install all',
-				variant: 'primary',
-				icon: asset('DownloadIcon'),
+				text: uninstall ? 'Confirm uninstall all' : 'Confirm install all',
+				variant: uninstall ? 'destructive' : 'primary',
+				icon: asset(uninstall ? 'TrashIcon' : 'DownloadIcon'),
 				onPress: () => {
 					finish(true)
 					ActionSheetActionCreators.hideActionSheet(BULK_SHEET)
@@ -689,6 +689,7 @@ function BulkInstallSheet({ items, missing, onResult }: BulkProps) {
 			}),
 			size ? h(Text, { variant: 'text-sm/medium', color: 'text-muted', style: { textAlign: 'center' } }, `${formatBytes(size)} in total from ${pluralize(groups.length, 'repository').replace('repositorys', 'repositories')}`) : null,
 			missing.length ? h(Text, { variant: 'text-sm/medium', color: 'text-feedback-warning', style: { textAlign: 'center' } }, `Also adds to Valenced: ${missing.join(', ')}`) : null,
+			warning ? h(Text, { variant: 'text-sm/medium', color: 'text-feedback-warning', style: { textAlign: 'center' } }, warning) : null,
 		),
 	)
 
@@ -724,6 +725,11 @@ function BulkInstallSheet({ items, missing, onResult }: BulkProps) {
 }
 
 // resolves true only when the user confirms
+export const openBulkUninstallSheet = (items: BulkItem[], warning?: string) =>
+	new Promise<boolean>(done =>
+		ActionSheetActionCreators.openLazy(Promise.resolve({ default: BulkInstallSheet }), BULK_SHEET, { items, missing: [], uninstall: true, warning, onResult: done }),
+	)
+
 export const openBulkInstallSheet = (items: BulkItem[], missing: string[]) =>
 	new Promise<boolean>(done =>
 		ActionSheetActionCreators.openLazy(Promise.resolve({ default: BulkInstallSheet }), BULK_SHEET, { items, missing, onResult: done }),

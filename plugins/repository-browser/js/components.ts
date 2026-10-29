@@ -1,4 +1,5 @@
 import { Checkbox } from '@valenced/components'
+import { Tokens } from '@valenced/discord/common/tokens'
 import { Design } from '@valenced/discord/design'
 import { React, ReactNative } from '@valenced/react'
 import { cachedAvatar, catalog, discordUser, githubAvatar, newRepoCount, unreadCount, useStore } from './data'
@@ -43,6 +44,8 @@ export function RepoAvatar({ repo, listing, epoch, person }: { repo: Repo; listi
 }
 
 type PluginCardProps = {
+	pinned?: boolean
+	compact?: boolean
 	plugin: ListedPlugin
 	version?: string
 	origin?: string
@@ -56,7 +59,7 @@ type PluginCardProps = {
 }
 
 export function PluginCard(props: PluginCardProps) {
-	const { plugin, version, origin, actions, update, warning, selectable, selected, onPress, onLongPress } = props
+	const { plugin, version, pinned, compact, origin, actions, update, warning, selectable, selected, onPress, onLongPress } = props
 	const { Pressable, View } = ReactNative
 	const { Button, Card, Text } = Design
 	return h(
@@ -88,9 +91,10 @@ export function PluginCard(props: PluginCardProps) {
 				h(
 					View,
 					{ style: { paddingLeft: ICON_INDENT, marginTop: 6 } },
-					h(PluginByline, { plugin, version }),
+					!compact && h(PluginByline, { plugin, version }),
 					origin && h(Text, { color: 'text-muted', variant: 'text-sm/medium', style: { marginTop: 2 } }, origin),
-					h(Text, { variant: 'text-md/medium', style: { marginTop: 4 } }, plugin.description),
+					h(Text, { variant: 'text-md/medium', style: { marginTop: compact ? 0 : 4 } }, plugin.description),
+					pinned && h(Text, { variant: 'text-sm/semibold', color: 'text-link', style: { marginTop: 6 } }, 'Pinned \u2022 updates are skipped'),
 					update &&
 						h(
 							View,
@@ -117,6 +121,39 @@ export function NoteBanner({ note }: { note: Note }) {
 		{ border: 'strong', style: { paddingVertical: 14, paddingHorizontal: 16 } },
 		note.title ? h(Text, { variant: 'heading-md/semibold', color }, note.title) : null,
 		h(Text, { variant: 'text-sm/medium', color: color ?? 'text-muted', style: { marginTop: note.title ? 4 : 0 } }, note.text),
+	)
+}
+
+export function CountsCard({ repos, stats, loading }: { repos: number; stats: { label: string; value: number }[]; loading: number }) {
+	const { View } = ReactNative
+	const { Card, Text } = Design
+	const stat = (value: number, label: string) =>
+		h(
+			View,
+			{ key: label, style: { flexDirection: 'row', alignItems: 'baseline', gap: 4 } },
+			h(Text, { variant: 'text-md/semibold' }, String(value)),
+			h(Text, { variant: 'text-sm/medium', color: 'text-muted' }, label),
+		)
+	// the stats spread edge to edge so the row fills the card whatever the counts are
+	return h(
+		Card,
+		{ border: 'strong', style: { paddingVertical: 8, paddingHorizontal: 12 } },
+		h(
+			View,
+			{ style: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: 10, rowGap: 2 } },
+			stat(repos, repos === 1 ? 'Repository' : 'Repositories'),
+			...stats.map(item => stat(item.value, item.label)),
+		),
+		loading ? h(Text, { variant: 'text-xs/medium', color: 'text-muted', style: { marginTop: 2 } }, `Loading ${loading} more...`) : null,
+	)
+}
+
+export function TipNote({ text }: { text: string }) {
+	const { Card, Text } = Design
+	return h(
+		Card,
+		{ border: 'strong', style: { paddingVertical: 12, paddingHorizontal: 14 } },
+		h(Text, { variant: 'text-md/medium' }, h(Text, { variant: 'text-md/semibold', color: 'text-link' }, 'Tip: '), text),
 	)
 }
 

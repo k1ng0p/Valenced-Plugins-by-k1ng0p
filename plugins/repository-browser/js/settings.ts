@@ -3,8 +3,8 @@ import { Design } from '@valenced/discord/design'
 import { ReactNativeSafeAreaContext } from '@valenced/externals/react-native-safe-area-context'
 import { ReactNavigationNative } from '@valenced/externals/react-navigation'
 import { React, ReactNative } from '@valenced/react'
-import { FeedSection, NoteBanner, Notice, PluginCard, RepoAvatar, RepoBadges } from './components'
-import { openBulkInstallSheet, openPluginSheet } from './sheets'
+import { CountsCard, FeedSection, NoteBanner, Notice, PluginCard, TipNote, RepoAvatar, RepoBadges } from './components'
+import { openBulkInstallSheet, openBulkUninstallSheet, openPluginSheet } from './sheets'
 import type { CardUpdate } from './components'
 import {
 	catalog,
@@ -29,7 +29,7 @@ import {
 	useStore,
 } from './data'
 import type { SeenEntry } from './data'
-import { THEMES_SETTINGS, THEME_SUPPORT, available, blocked, install, installMany, openPluginSettings, pendingReload, putRepos, readState, toggle, uninstall, updatePlugins } from './valenced'
+import { THEMES_SETTINGS, THEME_SUPPORT, available, blocked, checkInstall, install, installMany, openPluginSettings, pendingReload, putRepos, readState, toggle, uninstall, uninstallMany, updatePlugins } from './valenced'
 import type { BulkItem } from './valenced'
 import type { ValencedState } from './valenced'
 import { ALERT_MODES, BUILT_IN_NOTE, setHaptics, tap, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
@@ -40,6 +40,8 @@ type Hit = { repo: Repo; plugin: ListedPlugin }
 // the navigation types aren't shipped with Valenced's externals, only the part used here
 type ScreenNavigation = {
 	isFocused(): boolean
+	setOptions(options: { headerRight?: () => unknown }): void
+	setOptions(options: { headerRight?: () => unknown }): void
 	addListener(type: 'beforeRemove', listener: (event: { data: { action: { type: string } }; preventDefault(): void }) => void): () => void
 }
 type Ctx = ReturnType<typeof useBrowser>
@@ -57,6 +59,8 @@ function useBrowser() {
 	const [current, setCurrent] = React.useState<Repo | null>(null)
 	const [selection, setSelection] = React.useState<Record<string, Hit>>({})
 	const [bulkBusy, setBulkBusy] = React.useState(false)
+	const [settingsOpen, setSettingsOpen] = React.useState(false)
+	const [checks, setChecks] = React.useState<Record<string, string>>({})
 	const [updatingIds, setUpdatingIds] = React.useState<string[]>([])
 	const [authorNames, setAuthorNames] = React.useState<Record<string, string>>({})
 	const [state, setState] = React.useState<ValencedState | null>(null)
@@ -134,6 +138,7 @@ function useBrowser() {
 	const showList = () => {
 		setQuery('')
 		setCurrent(null)
+		setSettingsOpen(false)
 	}
 
 	React.useEffect(() => {
@@ -167,8 +172,16 @@ function useBrowser() {
 	const selecting = Object.keys(selection).length > 0
 	const navigation = React.useContext(ReactNavigationNative.NavigationContext) as ScreenNavigation | undefined
 
+	// settings open from the header on the main list, like the built-in plugins page
+	const onMain = !current && !settingsOpen
 	React.useEffect(() => {
-		if (!current && !selecting) return
+		if (!navigation || !onMain) return
+		navigation.setOptions({ headerRight: () => h(Design.IconButton, { size: 'md', variant: 'tertiary', icon: asset('SettingsIcon'), accessibilityLabel: 'Settings', onPress: () => setSettingsOpen(true) }) })
+		return () => navigation.setOptions({ headerRight: undefined })
+	}, [navigation, onMain])
+
+	React.useEffect(() => {
+		if (!current && !selecting && !settingsOpen) return
 		const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
 			// a plugin's own settings can sit on top while this screen stays mounted, back belongs to that screen then
 			if (navigation && !navigation.isFocused()) return false
@@ -177,18 +190,18 @@ function useBrowser() {
 			return true
 		})
 		return () => subscription.remove()
-	}, [navigation, current, selecting])
+	}, [navigation, current, selecting, settingsOpen])
 
 	// the back arrow and the system back can reach the screen before the handler above, so a repository is also closed here
 	React.useEffect(() => {
-		if (!current && !selecting) return
+		if (!current && !selecting && !settingsOpen) return
 		return navigation?.addListener('beforeRemove', event => {
 			if (event.data.action.type !== 'GO_BACK' && event.data.action.type !== 'POP') return
 			event.preventDefault()
 			if (selecting) setSelection({})
 			else showList()
 		})
-	}, [navigation, current, selecting])
+	}, [navigation, current, selecting, settingsOpen])
 
 	React.useEffect(() => setLimit(PAGE_SIZE), [query, current, sort, kind, repoKind])
 
@@ -381,7 +394,7 @@ function useBrowser() {
 					size: 'sm',
 					icon: asset('DownloadIcon'),
 					loading: installing === plugin.id,
-					disabled: isLegacy(plugin),
+					disabled: isLegacy(plugin) || !!installBlock(repo, plugin),
 					onPress: () => installPlugin(repo, plugin),
 				}),
 			]
@@ -406,6 +419,42 @@ function useBrowser() {
 			else next[plugin.id] = { repo, plugin }
 			return next
 		})
+	}
+
+	// the first plugin picked decides whether the selection installs or uninstalls
+	const selectionMode = selecting ? (state?.installed.has(Object.keys(selection)[0]) ? 'uninstall' : 'install') : null
+
+	const uninstallSelected = async () => {
+		if (bulkBusy || !state) return
+		const items: BulkItem[] = (Object.values(selection) as Hit[])
+			.filter(({ plugin }) => state.installed.has(plugin.id))
+			.map(({ repo, plugin }) => ({
+				id: plugin.id,
+				name: plugin.name,
+				repo: repo.url,
+				repoName: repoName(repo),
+				version: state.installed.get(plugin.id)?.version ?? plugin.version,
+				size: plugin.size,
+				description: plugin.description,
+				icon: plugin.icon,
+			}))
+		if (!items.length) {
+			setSelection({})
+			return
+		}
+
+		const removing = new Set(items.map(item => item.name))
+		const dependents = [...new Set(items.flatMap(item => dependentsOf(item.id, state.installed)))].filter(name => !removing.has(name.replace(' (optional)', '')))
+		const warning = dependents.length ? `Required by: ${dependents.join(', ')}. Removing them may break these.` : undefined
+		if (!(await openBulkUninstallSheet(items, warning))) return
+
+		setBulkBusy(true)
+		try {
+			if (await uninstallMany(items)) setSelection({})
+			await syncState()
+		} finally {
+			setBulkBusy(false)
+		}
 	}
 
 	const installSelected = async () => {
@@ -442,26 +491,66 @@ function useBrowser() {
 	const pluginCard = (repo: Repo, plugin: ListedPlugin, fromSearch = false) => {
 		const installed = state?.installed.has(plugin.id) ?? false
 		const installedInfo = state?.installed.get(plugin.id)
-		const version = installedInfo ? `${installedInfo.version}${installedInfo.source?.held ? ' \u2022 Pinned' : ''}` : plugin.version
+		const version = installedInfo?.version ?? plugin.version
 		const origin = fromSearch ? `${kindInfoOf(kindOf(plugin, repo.kinds)).label} from ${repoName(repo)}${addedRepo(repo.url)?.enabled ? '' : ' \u2022 repository not added'}` : undefined
-		const selectable = selecting && !installed
+		const matchesMode = selecting && installed === (selectionMode === 'uninstall')
+		const installable = installed || !(isLegacy(plugin) || installBlock(repo, plugin))
+		const selectable = matchesMode && installable
 		return h(PluginCard, {
 			key: `${repo.url}#${plugin.id}`,
 			plugin,
 			version,
+			pinned: !!installedInfo?.source?.held,
+			compact,
 			origin,
 			actions: pluginActions(repo, plugin, fromSearch),
 			update: updateFor(repo, plugin),
-			warning: [compatibilityWarning(plugin, state?.discord, blocked.get(plugin.id)?.text), ...missingDependencies(plugin, state?.installed)].filter(Boolean).join('\n') || undefined,
+			warning: [compatibilityWarning(plugin, state?.discord, blocked.get(plugin.id)?.text), ...missingDependencies(plugin, state?.installed), installBlock(repo, plugin) && `Can't be installed: ${installBlock(repo, plugin)}`].filter(Boolean).join('\n') || undefined,
 			selectable,
 			selected: selection[plugin.id]?.repo.url === repo.url,
 			onPress: selectable ? () => toggleSelect(repo, plugin) : () => openPluginSheet({ repo, plugin, onChange: syncState }),
-			onLongPress: installed || isLegacy(plugin) ? undefined : () => toggleSelect(repo, plugin),
+			onLongPress: selectable || (!selecting && installable) ? () => toggleSelect(repo, plugin) : undefined,
 		})
 	}
 
 	const moreButton = (total: number) =>
 		total > limit ? h(Button, { key: 'more', text: `Show more (${total - limit})`, variant: 'secondary', onPress: () => setLimit(count => count + PAGE_SIZE) }) : null
+
+	const haptics = data?.haptics !== false
+	const changeHaptics = (value: boolean) => {
+		setHaptics(value)
+		save({ haptics: value })
+		tap()
+	}
+
+	const compact = data?.compact === true
+	const changeCompact = (value: boolean) => {
+		save({ compact: value })
+		tap()
+	}
+
+	const checkKey = (repo: Repo, plugin: ListedPlugin) => `${repo.url}#${plugin.id}@${plugin.version}`
+	const installBlock = (repo: Repo, plugin: ListedPlugin) => checks[checkKey(repo, plugin)]
+	const installedIds = state ? [...state.installed.keys()].join() : ''
+
+	// Valenced plans each plugin of the open repository, so a card can say what can't be installed before anyone taps it
+	React.useEffect(() => {
+		setChecks({})
+		if (!current || !state || !addedRepo(current.url)?.enabled) return
+		let cancelled = false
+		const run = async () => {
+			for (const plugin of (listings.get(current.url)?.plugins ?? []).slice(0, 60)) {
+				if (cancelled) return
+				if (state.installed.has(plugin.id) || isLegacy(plugin)) continue
+				const reason = await checkInstall(current.url, plugin)
+				if (reason && !cancelled) setChecks(previous => ({ ...previous, [checkKey(current, plugin)]: reason }))
+			}
+		}
+		run()
+		return () => {
+			cancelled = true
+		}
+	}, [current?.url, installedIds, !!state])
 
 	const controls = () =>
 		h(
@@ -525,13 +614,14 @@ function useBrowser() {
 		selection,
 		selecting,
 		bulkBusy,
+		selectionMode,
+		uninstallSelected,
 		note: data?.remote?.note ?? null,
-		haptics: data?.haptics !== false,
-		changeHaptics: (value: boolean) => {
-			setHaptics(value)
-			save({ haptics: value })
-			tap()
-		},
+		settingsOpen,
+		haptics,
+		changeHaptics,
+		compact,
+		changeCompact,
 		setSelection,
 		installSelected,
 		updatingIds,
@@ -706,7 +796,7 @@ function emptyList(b: Ctx) {
 }
 
 function MainPage(b: Ctx, tab: PluginKind) {
-	const { TableRow, TableRowGroup, TableSwitchRow, Text } = Design
+	const { TableRow, TableRowGroup, Text } = Design
 	const { sort } = b
 
 	// a repository stays visible while it loads or fails so it can be retried
@@ -722,6 +812,14 @@ function MainPage(b: Ctx, tab: PluginKind) {
 
 	return [
 		h(Notice, { key: 'notice' }),
+		catalog.length
+			? h(CountsCard, {
+					key: 'counts',
+					repos: catalog.length,
+					stats: KINDS.map(kind => ({ label: kind.label, value: catalog.reduce((total, repo) => total + b.countOf(repo, kind.id), 0) })),
+					loading: catalog.filter(repo => !listings.get(repo.url)).length,
+				})
+			: null,
 		b.note ? h(NoteBanner, { key: 'note', note: b.note }) : null,
 		b.sortNote(repos.map(b.repoRank)),
 		updatesSection(b, tab),
@@ -729,7 +827,7 @@ function MainPage(b: Ctx, tab: PluginKind) {
 		feed(b, tab, 'updates', 'Recently updated'),
 		catalog.length ? null : emptyList(b),
 		catalog.length && !repos.length ? h(Text, { key: 'nokind', variant: 'text-md/medium', color: 'text-muted' }, `No ${kindInfoOf(tab).plural} in the listed repositories yet.`) : null,
-		repos.length ? h(TableRowGroup, { key: 'all', title: 'Repositories', description: `${repos.length} repositories` }, repos.map(repo => repoRow(b, repo, tab))) : null,
+		repos.length ? h(TableRowGroup, { key: 'all', title: 'Repositories' }, repos.map(repo => repoRow(b, repo, tab))) : null,
 		recentProblems().length
 			? h(
 					TableRowGroup,
@@ -737,11 +835,6 @@ function MainPage(b: Ctx, tab: PluginKind) {
 					h(TableRow, { label: `Recent problems (${recentProblems().length})`, subLabel: 'Copy them to share when something breaks', arrow: true, onPress: () => copyToClipboard(problemsText()) }),
 				)
 			: null,
-		h(
-			TableRowGroup,
-			{ key: 'preferences', title: 'Preferences' },
-			h(TableSwitchRow, { label: 'Haptic feedback', subLabel: 'A short vibration when selecting, installing and updating (Android)', value: b.haptics, onValueChange: b.changeHaptics }),
-		),
 	]
 }
 
@@ -864,7 +957,7 @@ function RepoPage(b: Ctx, repo: Repo) {
 			{ key: 'plugins', spacing: 12 },
 			h(Text, { variant: 'text-md/semibold', color: 'text-muted' }, `This repository comes with ${pluralKind(tab, b.countOf(repo, tab))}`),
 			!entry?.enabled && h(Text, { key: 'hint', variant: 'text-sm/medium', color: 'text-muted' }, 'Add this repository to Valenced to install its plugins.'),
-			visible.length > 1 && !b.selecting && h(Text, { key: 'tip', variant: 'text-sm/medium', color: 'text-muted' }, 'Tip: Tap and Hold on any plugin to select and install Bulk plugins with single click'),
+			visible.length > 1 && !b.selecting && h(TipNote, { key: 'tip', text: 'Tap and hold any plugin to select it, then install or uninstall several plugins at once.' }),
 			b.sortNote(visible.map(item => b.pluginRank(item.repo, item.plugin))),
 			b.needle && !visible.length && b.noMatches(),
 			...visible.slice(0, b.limit).map(item => b.pluginCard(item.repo, item.plugin)),
@@ -890,7 +983,9 @@ function SelectionBar(b: Ctx) {
 				Stack,
 				{ spacing: 8 },
 				h(Text, { variant: 'text-md/semibold' }, `${count} selected`),
-				h(Button, { text: 'Install all', variant: 'primary', icon: asset('DownloadIcon'), loading: b.bulkBusy, disabled: b.bulkBusy, onPress: b.installSelected }),
+				b.selectionMode === 'uninstall'
+					? h(Button, { text: 'Uninstall all', variant: 'destructive', icon: asset('TrashIcon'), loading: b.bulkBusy, disabled: b.bulkBusy, onPress: b.uninstallSelected })
+					: h(Button, { text: 'Install all', variant: 'primary', icon: asset('DownloadIcon'), loading: b.bulkBusy, disabled: b.bulkBusy, onPress: b.installSelected }),
 				b.current
 					? h(Button, { text: 'Select more from other repositories', variant: 'secondary', disabled: b.bulkBusy, onPress: b.showList })
 					: h(Text, { variant: 'text-sm/medium', color: 'text-muted' }, 'Open another repository to add more plugins.'),
@@ -898,6 +993,22 @@ function SelectionBar(b: Ctx) {
 			),
 		),
 	)
+}
+
+function SettingsPage(b: Ctx) {
+	const { TableRowGroup, TableSwitchRow } = Design
+	return [
+		h(
+			TableRowGroup,
+			{ key: 'appearance', title: 'Appearance' },
+			h(TableSwitchRow, { label: 'Compact plugin cards', subLabel: 'Hide the author, contributors and version on plugin cards', value: b.compact, onValueChange: b.changeCompact }),
+		),
+		h(
+			TableRowGroup,
+			{ key: 'feedback', title: 'Feedback' },
+			h(TableSwitchRow, { label: 'Haptic feedback', subLabel: 'A short vibration when selecting, installing and updating (Android)', value: b.haptics, onValueChange: b.changeHaptics }),
+		),
+	]
 }
 
 export function Browser() {
@@ -927,10 +1038,17 @@ export function Browser() {
 		onPageChange: (index: number) => b.setKind(KINDS[index].id),
 	})
 
+	if (b.settingsOpen) return h(View, { style: { flex: 1 } }, h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: contentStyle }, SettingsPage(b))))
+
 	return h(
 		View,
 		{ style: { flex: 1 } },
-		h(View, { style: { paddingHorizontal: 16, paddingTop: 16, gap: 12 } }, b.controls(), tabbed && h(SegmentedControl, { state: tabs })),
+		h(
+			View,
+			{ style: { paddingHorizontal: 16, paddingTop: 16, gap: 12 } },
+			b.controls(),
+			tabbed && h(SegmentedControl, { state: tabs }),
+		),
 		tabbed
 			? h(View, { style: { flex: 1 }, onLayout: (e: any) => setPageWidth(e.nativeEvent.layout.width) }, h(SegmentedControlPages, { state: tabs }))
 			: h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: contentStyle }, b.current ? RepoPage(b, b.current) : SearchPage(b))),

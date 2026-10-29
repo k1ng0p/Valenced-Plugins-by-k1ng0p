@@ -49,10 +49,22 @@
       "badges": ["Utility", "Ports"]
     },
     {
+      "url": "https://xezjk.github.io/valenced-plugins/",
+      "source": "https://github.com/xezjk/valenced-plugins",
+      "discord": "985520795126206464",
+      "badges": ["Utility", "Ports"]
+    },
+    {
       "url": "https://noreplyui5.github.io/valenced-plugin/",
       "source": "https://github.com/NoReplyUI5/valenced-plugin",
       "discord": "1053918356375351386",
       "badges": ["Trusted", "Ports"]
+    },
+    {
+      "url": "https://aeongdesu.github.io/slimplugins",
+      "source": "https://github.com/aeongdesu/slimplugins",
+      "discord": "548821619661864962",
+      "badges": ["Ports"]
     },
     {
       "url": "https://yumistra.github.io/Freestyle-Valenced",

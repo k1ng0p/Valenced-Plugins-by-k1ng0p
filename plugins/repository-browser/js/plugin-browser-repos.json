@@ -55,6 +55,12 @@
       "badges": ["Utility", "Ports"]
     },
     {
+      "url": "https://purple-eyez.github.io/Valenced-Plugins/",
+      "source": "https://github.com/Purple-EyeZ/Valenced-Plugins",
+      "discord": "646535537334812682",
+      "badges": ["Trusted", "Developer", "Ports", "Themes"]
+    },
+    {
       "url": "https://noreplyui5.github.io/valenced-plugin/",
       "source": "https://github.com/NoReplyUI5/valenced-plugin",
       "discord": "1053918356375351386",

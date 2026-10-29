@@ -97,6 +97,8 @@ export const COMMUNITY_REPO = 'https://community.valenced.app/'
 
 // comes with Valenced itself and can't be removed, so it is always listed, and always last
 export const BUILT_IN_REPO: Repo = { url: slash(COMMUNITY_REPO), source: 'https://github.com/Valenced/valenced-community-plugins', badges: ['Built in Repo'], builtIn: true }
+export const SELF_ID = 'k1ngop.repository-browser'
+
 export type Note = { title?: string; text: string; level: 'info' | 'warning' | 'critical' }
 
 let hapticsOn = true

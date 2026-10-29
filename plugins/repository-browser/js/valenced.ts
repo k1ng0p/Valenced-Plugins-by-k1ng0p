@@ -21,22 +21,25 @@ const warningMessages = (plan: any): string[] =>
 		.map((warning: any) => (typeof warning === 'string' ? warning : warning?.message))
 		.filter(Boolean)
 
+// what a repository offers only changes when it is refreshed, so it isn't asked again for every state read
+const PROVIDED_TTL = 5 * 60 * 1000
+const providedCache = new Map<string, { at: number; ids: string[] }>()
+
 async function refreshProvided(repos: ValencedRepo[]) {
-	const found = new Set<string>()
 	await Promise.all(
 		repos
-			.filter(repo => repo.enabled)
+			.filter(repo => repo.enabled && Date.now() - (providedCache.get(slash(repo.url))?.at ?? 0) > PROVIDED_TTL)
 			.map(repo =>
 				native('valenced.plugins.repos.listPlugins', [repo.url]).then(
 					(list: { id: string }[] | null) => {
-						for (const item of list ?? []) found.add(item.id)
+						providedCache.set(slash(repo.url), { at: Date.now(), ids: (list ?? []).map(item => item.id) })
 					},
 					error => logProblem(`list ${repo.url}`, error),
 				),
 			),
 	)
 	providedIds.clear()
-	for (const id of found) providedIds.add(id)
+	for (const repo of repos) if (repo.enabled) for (const id of providedCache.get(slash(repo.url))?.ids ?? []) providedIds.add(id)
 }
 
 export async function readState() {
@@ -82,7 +85,10 @@ export async function refreshAvailable(catalog: Repo[]) {
 		await Promise.all(
 			active.slice(start, start + REFRESH_BATCH).map(repo =>
 				native('valenced.plugins.repos.refresh', [repo.url]).then(
-					() => clearProblems(`refresh ${repo.url}`),
+					() => {
+						providedCache.delete(slash(repo.url))
+						clearProblems(`refresh ${repo.url}`)
+					},
 					error => logProblem(`refresh ${repo.url}`, error),
 				),
 			),
@@ -299,6 +305,40 @@ async function setEnabled(id: string, on: boolean) {
 		for (const dependency of disabled) await native('valenced.plugins.setEnabled', [dependency.id, true, false])
 		await writeEnabled(id, on)
 	}
+}
+
+// plugins that depend on each other can refuse to go first, so what failed is tried again once the rest is done
+export async function toggleMany(ids: string[], on: boolean) {
+	const word = on ? 'enable' : 'disable'
+	const done: string[] = []
+	let waiting = ids
+	let lastError: unknown
+	for (let pass = 0; pass < 3 && waiting.length; pass++) {
+		const failed: string[] = []
+		for (const id of waiting) {
+			try {
+				await setEnabled(id, on)
+				done.push(id)
+			} catch (e) {
+				failed.push(id)
+				lastError = e
+			}
+		}
+		if (failed.length === waiting.length) break
+		waiting = failed
+	}
+
+	const failed = ids.filter(id => !done.includes(id))
+	if (lastError && failed.length) reportError(lastError, `${word} plugins`)
+	if (done.length) {
+		tap()
+
+		const hostPrompts = !on && (await readState().then(state => done.some(id => state.enabled[id]?.pendingReload)).catch(() => false))
+		if (!hostPrompts) askReload(`${on ? 'Enabled' : 'Disabled'} ${done.length} plugin${done.length === 1 ? '' : 's'}${failed.length ? `, ${failed.length} could not be changed` : ''}. Reload to apply it.`)
+	} else if (lastError) {
+		showError(lastError)
+	}
+	return done
 }
 
 export async function toggle(id: string, on: boolean) {

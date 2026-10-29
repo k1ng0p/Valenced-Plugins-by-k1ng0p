@@ -29,10 +29,10 @@ import {
 	useStore,
 } from './data'
 import type { SeenEntry } from './data'
-import { THEMES_SETTINGS, THEME_SUPPORT, available, blocked, checkInstall, install, installMany, openPluginSettings, pendingReload, putRepos, readState, toggle, uninstall, uninstallMany, updatePlugins } from './valenced'
+import { THEMES_SETTINGS, THEME_SUPPORT, available, blocked, checkInstall, install, installMany, openPluginSettings, pendingReload, putRepos, readState, toggle, toggleMany, uninstall, uninstallMany, updatePlugins } from './valenced'
 import type { BulkItem } from './valenced'
 import type { ValencedState } from './valenced'
-import { ALERT_MODES, BUILT_IN_NOTE, setHaptics, tap, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
+import { ALERT_MODES, BUILT_IN_NOTE, SELF_ID, confirm, setHaptics, tap, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
 import type { AlertMode, AvailableUpdate, ListedPlugin, PluginKind, Repo, SortKey } from './shared'
 
 type Hit = { repo: Repo; plugin: ListedPlugin }
@@ -207,6 +207,10 @@ function useBrowser() {
 
 	const inKind = (repo: Repo, plugin: ListedPlugin, tab: PluginKind) => kindOf(plugin, repo.kinds) === tab
 	const countOf = (repo: Repo, tab: PluginKind) => (listings.get(repo.url)?.plugins ?? []).filter(plugin => inKind(repo, plugin, tab)).length
+
+	// the counts only change when a repository's list does, so they aren't worked out again on every render
+	const statsKey = catalog.map(repo => listings.get(repo.url)?.plugins.length ?? -1).join()
+	const stats = React.useMemo(() => KINDS.map(kind => ({ label: kind.label, value: catalog.reduce((total, repo) => total + countOf(repo, kind.id), 0) })), [statsKey])
 
 	const isEnabled = (id: string) => toggled.get(id)?.value ?? state?.enabled[id]?.enabled ?? false
 	const addedRepo = (url: string) => state?.repos.find(repo => !repo.internal && slash(repo.url) === slash(url)) ?? (isBuiltIn(url) ? { url, enabled: true } : undefined)
@@ -422,7 +426,51 @@ function useBrowser() {
 	}
 
 	// the first plugin picked decides whether the selection installs or uninstalls
-	const selectionMode = selecting ? (state?.installed.has(Object.keys(selection)[0]) ? 'uninstall' : 'install') : null
+	const firstPicked = selecting ? Object.keys(selection)[0] : undefined
+	const selectionMode = selecting ? (state?.installed.has(firstPicked!) ? (state.enabled[firstPicked!]?.enabled ? 'enabled' : 'disabled') : 'install') : null
+
+	const toggleSelected = async (on: boolean) => {
+		if (bulkBusy || !state) return
+		// this plugin stays on, it is the way back in
+		const ids = Object.keys(selection).filter(id => state.installed.has(id) && (on || id !== SELF_ID))
+		if (!ids.length) {
+			setSelection({})
+			return
+		}
+
+		setBulkBusy(true)
+		try {
+			if ((await toggleMany(ids, on)).length) setSelection({})
+			await syncState()
+		} finally {
+			setBulkBusy(false)
+		}
+	}
+
+	const changeDisableAll = async (value: boolean) => {
+		if (bulkBusy || !state) return
+		setBulkBusy(true)
+		try {
+			if (value) {
+				const ids = [...state.installed.keys()].filter(id => id !== SELF_ID && state.enabled[id]?.enabled)
+				if (!ids.length) {
+					inform('Nothing to disable', 'None of your downloaded plugins are enabled.')
+					return
+				}
+				if (!(await confirm('Disable all plugins?', `${ids.length} downloaded plugin${ids.length === 1 ? '' : 's'} will be turned off until you switch this off again. Plugin Browser and Valenced's own plugins stay on.`, 'Disable all', 'destructive'))) return
+				const done = await toggleMany(ids, false)
+				if (done.length) save({ disabledAll: done })
+			} else {
+				const ids = (data?.disabledAll ?? []).filter(id => state.installed.has(id))
+				const done = ids.length ? await toggleMany(ids, true) : []
+				const rest = ids.filter(id => !done.includes(id))
+				save({ disabledAll: rest.length ? rest : undefined })
+			}
+			await syncState()
+		} finally {
+			setBulkBusy(false)
+		}
+	}
 
 	const uninstallSelected = async () => {
 		if (bulkBusy || !state) return
@@ -493,7 +541,7 @@ function useBrowser() {
 		const installedInfo = state?.installed.get(plugin.id)
 		const version = installedInfo?.version ?? plugin.version
 		const origin = fromSearch ? `${kindInfoOf(kindOf(plugin, repo.kinds)).label} from ${repoName(repo)}${addedRepo(repo.url)?.enabled ? '' : ' \u2022 repository not added'}` : undefined
-		const matchesMode = selecting && installed === (selectionMode === 'uninstall')
+		const matchesMode = selecting && (selectionMode === 'install' ? !installed : installed && (state?.enabled[plugin.id]?.enabled ? 'enabled' : 'disabled') === selectionMode)
 		const installable = installed || !(isLegacy(plugin) || installBlock(repo, plugin))
 		const selectable = matchesMode && installable
 		return h(PluginCard, {
@@ -535,22 +583,34 @@ function useBrowser() {
 
 	// Valenced plans each plugin of the open repository, so a card can say what can't be installed before anyone taps it
 	React.useEffect(() => {
-		setChecks({})
-		if (!current || !state || !addedRepo(current.url)?.enabled) return
+		if (!current || !state || !addedRepo(current.url)?.enabled) {
+			setChecks({})
+			return
+		}
 		let cancelled = false
-		const run = async () => {
-			for (const plugin of (listings.get(current.url)?.plugins ?? []).slice(0, 60)) {
+		const known: Record<string, string> = {}
+		const queue: { plugin: ListedPlugin; key: string }[] = []
+		for (const plugin of (listings.get(current.url)?.plugins ?? []).slice(0, limit)) {
+			if (state.installed.has(plugin.id) || isLegacy(plugin)) continue
+			const key = `${checkKey(current, plugin)}|${installedIds}`
+			if (!installChecks.has(key)) queue.push({ plugin, key })
+			else if (installChecks.get(key)) known[checkKey(current, plugin)] = installChecks.get(key) as string
+		}
+		setChecks(known)
+
+		const worker = async () => {
+			for (let next = queue.shift(); next; next = queue.shift()) {
 				if (cancelled) return
-				if (state.installed.has(plugin.id) || isLegacy(plugin)) continue
-				const reason = await checkInstall(current.url, plugin)
-				if (reason && !cancelled) setChecks(previous => ({ ...previous, [checkKey(current, plugin)]: reason }))
+				const reason = await checkInstall(current.url, next.plugin)
+				installChecks.set(next.key, reason)
+				if (reason && !cancelled) setChecks(previous => ({ ...previous, [checkKey(current, next.plugin)]: reason }))
 			}
 		}
-		run()
+		for (let index = 0; index < 3; index++) worker()
 		return () => {
 			cancelled = true
 		}
-	}, [current?.url, installedIds, !!state])
+	}, [current?.url, installedIds, !!state, limit])
 
 	const controls = () =>
 		h(
@@ -616,6 +676,10 @@ function useBrowser() {
 		bulkBusy,
 		selectionMode,
 		uninstallSelected,
+		toggleSelected,
+		disableAll: !!data?.disabledAll?.length,
+		changeDisableAll,
+		stats,
 		note: data?.remote?.note ?? null,
 		settingsOpen,
 		haptics,
@@ -816,7 +880,7 @@ function MainPage(b: Ctx, tab: PluginKind) {
 			? h(CountsCard, {
 					key: 'counts',
 					repos: catalog.length,
-					stats: KINDS.map(kind => ({ label: kind.label, value: catalog.reduce((total, repo) => total + b.countOf(repo, kind.id), 0) })),
+					stats: b.stats,
 					loading: catalog.filter(repo => !listings.get(repo.url)).length,
 				})
 			: null,
@@ -966,6 +1030,9 @@ function RepoPage(b: Ctx, repo: Repo) {
 	]
 }
 
+// what Valenced said about a plugin is remembered, an install plan only changes with the plugin or what is installed
+const installChecks = new Map<string, string | null>()
+
 function SelectionBar(b: Ctx) {
 	const { View } = ReactNative
 	const { Button, Card, Stack, Text } = Design
@@ -983,8 +1050,17 @@ function SelectionBar(b: Ctx) {
 				Stack,
 				{ spacing: 8 },
 				h(Text, { variant: 'text-md/semibold' }, `${count} selected`),
-				b.selectionMode === 'uninstall'
-					? h(Button, { text: 'Uninstall all', variant: 'destructive', icon: asset('TrashIcon'), loading: b.bulkBusy, disabled: b.bulkBusy, onPress: b.uninstallSelected })
+				b.selectionMode !== 'install'
+					? [
+							h(Button, {
+								key: 'power',
+								text: b.selectionMode === 'enabled' ? 'Disable all' : 'Enable all',
+								variant: 'secondary',
+								disabled: b.bulkBusy,
+								onPress: () => b.toggleSelected(b.selectionMode === 'disabled'),
+							}),
+							h(Button, { key: 'remove', text: 'Uninstall all', variant: 'destructive', icon: asset('TrashIcon'), loading: b.bulkBusy, disabled: b.bulkBusy, onPress: b.uninstallSelected }),
+						]
 					: h(Button, { text: 'Install all', variant: 'primary', icon: asset('DownloadIcon'), loading: b.bulkBusy, disabled: b.bulkBusy, onPress: b.installSelected }),
 				b.current
 					? h(Button, { text: 'Select more from other repositories', variant: 'secondary', disabled: b.bulkBusy, onPress: b.showList })
@@ -1008,6 +1084,17 @@ function SettingsPage(b: Ctx) {
 			{ key: 'feedback', title: 'Feedback' },
 			h(TableSwitchRow, { label: 'Haptic feedback', subLabel: 'A short vibration when selecting, installing and updating (Android)', value: b.haptics, onValueChange: b.changeHaptics }),
 		),
+		h(
+			TableRowGroup,
+			{ key: 'plugins', title: 'Plugins' },
+			h(TableSwitchRow, {
+				label: 'Disable/Enable all Plugins',
+				subLabel: "Switch on to turn off every downloaded plugin at once, handy when something breaks. Switch off to bring back the ones that were running. Plugin Browser and Valenced's own plugins stay on.",
+				value: b.disableAll,
+				disabled: b.bulkBusy,
+				onValueChange: b.changeDisableAll,
+			}),
+		),
 	]
 }
 
@@ -1017,41 +1104,54 @@ export function Browser() {
 	const b = useBrowser()
 	const { bottom } = ReactNativeSafeAreaContext.useSafeAreaInsets()
 	const contentStyle = { padding: 16, paddingBottom: 16 + (b.selecting ? 0 : bottom) }
-	const [pageWidth, setPageWidth] = React.useState(0)
+	const [pageSize, setPageSize] = React.useState({ width: 0, height: 0 })
 	const active = Math.max(0, KINDS.findIndex(item => item.id === b.kind))
 
 	// tabs only belong to the main list, an open repository or a search replaces them
 	const tabbed = !b.current && !b.needle
+	const showTabs = tabbed && !b.settingsOpen
+
+	// the tab lists stay mounted underneath a repository, a search or the settings, so each one is still scrolled where it was left
+	// while they are out of sight the pages built last are reused instead of being rendered again
+	const builtPages = React.useRef<Record<string, ReturnType<typeof h>>>({})
 
 	// only the open tab and its neighbours are built, a swipe only ever reaches those
-	const items = KINDS.map(({ id, label }, index) => ({
-		id,
-		label: b.pings[id] ? `${label} \u2022` : label,
-		page: tabbed && Math.abs(index - active) <= 1 ? h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: contentStyle }, MainPage(b, id))) : null,
-	}))
+	const items = KINDS.map(({ id, label }, index) => {
+		const near = Math.abs(index - active) <= 1
+		if (near && showTabs) builtPages.current[id] = h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: contentStyle }, MainPage(b, id)))
+		return { id, label: b.pings[id] ? `${label} \u2022` : label, page: near ? (builtPages.current[id] ?? null) : null }
+	})
 
 	const tabs = useSegmentedControlState({
 		items,
-		pageWidth,
+		pageWidth: pageSize.width,
 		defaultIndex: active,
 		onSetActiveIndex: (index: number) => b.setKind(KINDS[index].id),
 		onPageChange: (index: number) => b.setKind(KINDS[index].id),
 	})
 
-	if (b.settingsOpen) return h(View, { style: { flex: 1 } }, h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: contentStyle }, SettingsPage(b))))
+	// out of sight the pages keep the size they had, just invisible and untouchable
+	const pagerStyle = showTabs ? { flex: 1 } : { position: 'absolute', top: 0, left: 0, width: pageSize.width, height: pageSize.height, opacity: 0 }
 
 	return h(
 		View,
 		{ style: { flex: 1 } },
+		b.settingsOpen
+			? h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: contentStyle }, SettingsPage(b)))
+			: h(View, { style: { paddingHorizontal: 16, paddingTop: 16, gap: 12 } }, b.controls(), tabbed && h(SegmentedControl, { state: tabs })),
+		!tabbed && !b.settingsOpen ? h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: contentStyle }, b.current ? RepoPage(b, b.current) : SearchPage(b))) : null,
 		h(
 			View,
-			{ style: { paddingHorizontal: 16, paddingTop: 16, gap: 12 } },
-			b.controls(),
-			tabbed && h(SegmentedControl, { state: tabs }),
+			{
+				style: pagerStyle,
+				pointerEvents: showTabs ? 'auto' : 'none',
+				onLayout: (e: any) => {
+					const { width, height } = e.nativeEvent.layout
+					if (showTabs && width > 0 && height > 0) setPageSize(previous => (previous.width === width && previous.height === height ? previous : { width, height }))
+				},
+			},
+			h(SegmentedControlPages, { state: tabs }),
 		),
-		tabbed
-			? h(View, { style: { flex: 1 }, onLayout: (e: any) => setPageWidth(e.nativeEvent.layout.width) }, h(SegmentedControlPages, { state: tabs }))
-			: h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: contentStyle }, b.current ? RepoPage(b, b.current) : SearchPage(b))),
-		SelectionBar(b),
+		b.settingsOpen ? null : SelectionBar(b),
 	)
 }

@@ -28,6 +28,7 @@ export type StoreData = {
 	muted: Record<string, PluginKind[]>
 	haptics?: boolean
 	compact?: boolean
+	disabledAll?: string[]
 }
 
 type JsonStore = {
@@ -67,6 +68,7 @@ export function readStore(): StoreData {
 		muted: asObject(raw.muted),
 		haptics: typeof raw.haptics === 'boolean' ? raw.haptics : undefined,
 		compact: typeof raw.compact === 'boolean' ? raw.compact : undefined,
+		disabledAll: Array.isArray(raw.disabledAll) ? raw.disabledAll.filter((id: unknown): id is string => typeof id === 'string') : undefined,
 	}
 }
 

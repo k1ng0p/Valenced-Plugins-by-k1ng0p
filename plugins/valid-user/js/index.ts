@@ -2,7 +2,7 @@ import { ToastActionCreators } from '@valenced/discord/actions'
 import { Dispatcher } from '@valenced/discord/common/flux'
 import { ImportTrackerModuleId } from '@valenced/discord/common/import-tracker'
 import { LoggerModuleId } from '@valenced/discord/common/logger'
-import { withStoreName } from '@valenced/discord/flux'
+import { Stores, withStoreName } from '@valenced/discord/flux'
 import { Clipboard } from '@valenced/externals/react-native-clipboard'
 import { getModules, lookupModule } from '@valenced/modules/finders'
 import {
@@ -13,16 +13,30 @@ import {
 import { instead } from '@valenced/patcher'
 import type { DiscordModules } from '@valenced/discord/types'
 
-const NO_ACCESS_TITLE = "You don't have access to this link."
-const NO_ACCESS_BODY = "This link is to a user you don't have access to."
+// Both are in intl/index.native.tsx
+const NoAccessTitleKey = 'r0DLNm'
+const NoAccessBodyKey = 'Fqqbhg'
 const SNOWFLAKE = /^\d{17,20}$/
+
+interface Intl {
+	intl: { formatToPlainString(message: unknown): string }
+	t: Record<string, unknown>
+	getAvailableLocales(): unknown
+}
 
 type ProfileSheet = (props: { userId: string }) => void
 
-type Alerts = { show(props: unknown): unknown }
+type Alerts = Record<'close' | 'openLazy' | 'confirm', unknown> & {
+	show(props: unknown): unknown
+}
 
 type Http = {
 	HTTP: { get(options: { url: string }): Promise<{ body?: unknown }> }
+}
+
+interface Message {
+	id: string
+	content?: string
 }
 
 async function cacheUser(userId: string) {
@@ -33,47 +47,80 @@ async function cacheUser(userId: string) {
 	Dispatcher.dispatch({ type: 'USER_UPDATE', user: body })
 }
 
+const RedrawDelay = 110
+const redraws = new Set<ReturnType<typeof setTimeout>>()
+
+// Messages keep the mention they were first rendered with, so the cached user alone changes nothing.
+function redrawMentions(userId: string) {
+	const SelectedChannelStore =
+		Stores.SelectedChannelStore as DiscordModules.Flux.Store<{
+			getChannelId(): string | undefined
+		}>
+	const channelId = SelectedChannelStore.getChannelId()
+	if (!channelId) return
+
+	const MessageStore = Stores.MessageStore as DiscordModules.Flux.Store<{
+		getMessages(channelId: string): { toArray(): Message[] }
+	}>
+	const mention = new RegExp(`<@!?${userId}>`)
+
+	for (const { id, content } of MessageStore.getMessages(channelId).toArray()) {
+		if (!content || !mention.test(content)) continue
+
+		Dispatcher.dispatch({
+			type: 'MESSAGE_UPDATE',
+			message: { id, channel_id: channelId, content: `${content}\u200b` },
+		})
+		const timer = setTimeout(() => {
+			redraws.delete(timer)
+			Dispatcher.dispatch({
+				type: 'MESSAGE_UPDATE',
+				message: { id, channel_id: channelId, content },
+			})
+		}, RedrawDelay)
+		redraws.add(timer)
+	}
+}
+
+let intl: Intl | undefined
 let profileSheet: ProfileSheet | undefined
 let http: Http | undefined
 
-function findProfileSheet(): ProfileSheet | undefined {
-	const named = withName('showUserProfileActionSheet')
+function findProfileSheet() {
+	const named = withName<ProfileSheet>('showUserProfileActionSheet')
 	const { ordered, relative } = withDependencies
-	const userStoreId = lookupModule(withStoreName('UserStore'))[1]
+	const [, UserStoreId] = lookupModule(withStoreName('UserStore'))
 
-	try {
-		const exact = lookupModule(
-			named.and(
-				withDependencies(
-					ordered([
-						LoggerModuleId,
-						userStoreId,
-						relative(1),
-						relative(2),
-						relative(3),
-						ImportTrackerModuleId,
-					]),
-				),
+	const [exact] = lookupModule(
+		named.and(
+			withDependencies(
+				ordered([
+					LoggerModuleId,
+					UserStoreId,
+					relative(1),
+					relative(2),
+					relative(3),
+					ImportTrackerModuleId,
+				]),
 			),
-		)[0]
-		if (exact) return exact as ProfileSheet
-	} catch {
-		// the exact match depends on Discord's module layout, the name alone is the fallback
-	}
+		),
+	)
 
-	return lookupModule(named)[0] as ProfileSheet | undefined
+	// the exact match depends on Discord's module layout, the name alone is the fallback
+	return exact ?? lookupModule(named)[0]
 }
 
 function isNoAccessAlert(
 	props: unknown,
+	{ intl, t }: Intl,
 ): props is { onConfirmSecondary(): void } {
 	return (
 		typeof props === 'object' &&
 		props !== null &&
 		'title' in props &&
-		props.title === NO_ACCESS_TITLE &&
+		props.title === intl.formatToPlainString(t[NoAccessTitleKey]) &&
 		'body' in props &&
-		props.body === NO_ACCESS_BODY &&
+		props.body === intl.formatToPlainString(t[NoAccessBodyKey]) &&
 		'onConfirmSecondary' in props &&
 		typeof props.onConfirmSecondary === 'function'
 	)
@@ -101,38 +148,51 @@ function readUserId(copyUserId: () => void) {
 
 export default plugin({
 	start({ cleanup, plugin }) {
+		cleanup(() => {
+			for (const timer of redraws) clearTimeout(timer)
+			redraws.clear()
+		})
 		cleanup(
-			getModules(withProps('show', 'close', 'openLazy', 'confirm'), alerts => {
-				cleanup(
-					instead(alerts as Alerts, 'show', ([props], orig) => {
-						try {
-							if (isNoAccessAlert(props)) {
-								const userId = readUserId(props.onConfirmSecondary)
-								profileSheet ??= findProfileSheet()
-								if (userId && profileSheet) {
-									const openProfile = profileSheet
-									cacheUser(userId)
-										.then(
-											() => {
-												openProfile({ userId })
-											},
-											error => {
-												plugin.reportError(error)
-												orig(props)
-											},
-										)
-										.catch(plugin.reportError)
-									return
-								}
-							}
-						} catch (error) {
-							plugin.reportError(error)
-						}
+			getModules(
+				withProps<Alerts>('show', 'close', 'openLazy', 'confirm'),
+				alerts => {
+					cleanup(
+						instead(alerts, 'show', ([props], orig) => {
+							try {
+								intl ??= lookupModule(
+									withProps<Intl>('intl', 't', 'getAvailableLocales'),
+								)[0]
+								if (!intl) throw new Error('Intl module not found')
 
-						return orig(props)
-					}),
-				)
-			}),
+								if (isNoAccessAlert(props, intl)) {
+									const userId = readUserId(props.onConfirmSecondary)
+									profileSheet ??= findProfileSheet()
+									if (userId && profileSheet) {
+										profileSheet({ userId })
+										cacheUser(userId)
+											.then(() => redrawMentions(userId))
+											.catch(plugin.reportError)
+										return
+									}
+
+									plugin.reportError(
+										new Error(
+											userId
+												? 'Profile sheet not found'
+												: 'Could not read the user ID from the alert',
+										),
+									)
+								}
+							} catch (error) {
+								plugin.reportError(error)
+							}
+
+							// show reads this.openLazy, so the original needs its receiver back
+							return orig.call(alerts, props)
+						}),
+					)
+				},
+			),
 		)
 	},
 })

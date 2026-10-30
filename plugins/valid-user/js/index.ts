@@ -47,7 +47,7 @@ async function cacheUser(userId: string) {
 	Dispatcher.dispatch({ type: 'USER_UPDATE', user: body })
 }
 
-const RedrawDelay = 110
+const RedrawDelay = 0
 const redraws = new Set<ReturnType<typeof setTimeout>>()
 
 // Messages keep the mention they were first rendered with, so the cached user alone changes nothing.

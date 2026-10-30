@@ -4,7 +4,7 @@ import { ReactNativeSafeAreaContext } from '@valenced/externals/react-native-saf
 import { ReactNavigationNative } from '@valenced/externals/react-navigation'
 import { React, ReactNative } from '@valenced/react'
 import { CountsCard, FeedSection, NoteBanner, Notice, PluginCard, TipNote, RepoAvatar, RepoBadges } from './components'
-import { openBulkInstallSheet, openBulkUninstallSheet, openPluginSheet } from './sheets'
+import { openBulkInstallSheet, openKindsSheet, openRepoInfoSheet, openBulkUninstallSheet, openPluginSheet } from './sheets'
 import type { CardUpdate } from './components'
 import {
 	catalog,
@@ -24,15 +24,13 @@ import {
 	pendingByKind,
 	repoOwner,
 	save,
-	setAlertMode,
-	setKindMuted,
 	useStore,
 } from './data'
 import type { SeenEntry } from './data'
 import { THEMES_SETTINGS, THEME_SUPPORT, available, blocked, checkInstall, install, installMany, openPluginSettings, pendingReload, putRepos, readState, toggle, toggleMany, uninstall, uninstallMany, updatePlugins } from './valenced'
 import type { BulkItem } from './valenced'
 import type { ValencedState } from './valenced'
-import { ALERT_MODES, BUILT_IN_NOTE, SELF_ID, confirm, setHaptics, tap, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
+import { BUILT_IN_NOTE, SELF_ID, confirm, setHaptics, tap, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
 import type { AlertMode, AvailableUpdate, ListedPlugin, PluginKind, Repo, SortKey } from './shared'
 
 type Hit = { repo: Repo; plugin: ListedPlugin }
@@ -226,26 +224,10 @@ function useBrowser() {
 		return id
 	}
 
-	const chooseAlerts = (repo: Repo, off: PluginKind[] = data?.muted?.[repo.url] ?? []) => {
-		const mode = alertMode(repo.url)
-		const kinds = KINDS.filter(item => countOf(repo, item.id) > 0)
-		const perKind = kinds.length > 1
-		modal('Notifications', `Choose what ${repoName(repo)} adds to the red count on the settings row.${perKind ? ' Each kind it offers can also be turned off on its own.' : ''}`, Button => [
-			...(Object.entries(ALERT_MODES) as [AlertMode, (typeof ALERT_MODES)[AlertMode]][]).map(([value, { button }]) =>
-				h(Button, { key: value, text: button, variant: value === mode ? 'primary' : 'secondary', onPress: () => setAlertMode(repo.url, value) }),
-			),
-			...(perKind
-				? kinds.map(item => {
-						const muted = off.includes(item.id)
-						const toggleKind = () => {
-							setKindMuted(repo.url, item.id, !muted)
-							// the popup closes on every press, so it comes back with the new state
-							chooseAlerts(repo, muted ? off.filter(kind => kind !== item.id) : [...off, item.id])
-						}
-						return h(Button, { key: `kind:${item.id}`, text: `${item.label}: ${muted ? 'off' : 'on'}`, variant: 'tertiary', onPress: toggleKind })
-					})
-				: []),
-		])
+	const openRepoInfo = (repo: Repo) => {
+		const listing = listings.get(repo.url)
+		const updated = listing?.err ? friendlyError(listing.err) : listing?.at ? `${listing.stale ? 'Last updated' : 'Updated'} ${ago(listing.at)}` : undefined
+		openRepoInfoSheet({ repo, name: repoName(repo), updated, note: repo.builtIn ? BUILT_IN_NOTE : undefined, kinds: KINDS.filter(item => countOf(repo, item.id) > 0), mode: alertMode(repo.url), muted: data?.muted?.[repo.url] ?? [] })
 	}
 
 	const runUpdate = async (ids: string[]) => {
@@ -621,11 +603,23 @@ function useBrowser() {
 				{ style: { flex: 1 } },
 				h(SearchInput, { value: query, onChange: setQuery, isClearable: true, placeholder: current ? 'Search this repository' : 'Search plugins and repositories' }),
 			),
-			!current &&
+			h(
+				View,
+				{ style: { marginLeft: 8 } },
+				h(IconButton, {
+					size: 'md',
+					variant: 'secondary',
+					icon: asset('RetryIcon'),
+					loading: current ? reloadingRepo : refreshing,
+					disabled: current ? reloadingRepo : refreshing,
+					onPress: current ? refreshCurrent : refreshAll,
+				}),
+			),
+			current &&
 				h(
 					View,
 					{ style: { marginLeft: 8 } },
-					h(IconButton, { size: 'md', variant: 'secondary', icon: asset('RetryIcon'), loading: refreshing, disabled: refreshing, onPress: refreshAll }),
+					h(IconButton, { size: 'md', variant: 'secondary', icon: asset('CircleInformationIcon') ?? asset('InfoIcon'), onPress: () => openRepoInfo(current) }),
 				),
 			h(
 				View,
@@ -713,7 +707,7 @@ function useBrowser() {
 		addedRepo,
 		repoName,
 		alertMode,
-		chooseAlerts,
+		openRepoInfo,
 		runUpdate,
 		matches,
 		pluginMatches,
@@ -812,25 +806,24 @@ function repoRow(b: Ctx, repo: Repo, tab?: PluginKind) {
 	let subLabel = 'Loading...'
 	if (listing?.err) subLabel = friendlyError(listing.err)
 	else if (listing?.stale) subLabel = `Couldn't refresh (${friendlyError(listing.stale)}). Showing ${listing.saved ? `the copy saved ${ago(listing.saved)}` : 'earlier data'}`
-	else if (listing) subLabel = [listing.description, hostOf(repo.url)].filter(Boolean).join('\n')
-	if (repo.builtIn && listing && !failed) subLabel = BUILT_IN_NOTE
-	if (b.newRepos[repo.url]) subLabel = `New repository\n${subLabel}`
+	else if (listing) subLabel = listing.description ?? ''
+	if (b.newRepos[repo.url]) subLabel = subLabel ? `New repository\n${subLabel}` : 'New repository'
 
 	let trailing
 	if (failed) trailing = h(Button, { text: listing?.tooLarge ? 'Load anyway' : 'Retry', size: 'sm', variant: 'secondary', loading: b.retrying === repo.url, onPress: () => b.loadAnyway(repo, !!listing?.tooLarge) })
 	else if (listing) trailing = h(TableRow.TrailingText, { text: tab ? `${kindInfoOf(tab).label} \u00b7 ${b.countOf(repo, tab)}` : `${KINDS.reduce((sum, item) => sum + b.countOf(repo, item.id), 0)} listed` })
 
-	const lines = b.newRepos[repo.url] ? 4 : 3
+	const lines = subLabel ? (b.newRepos[repo.url] ? 4 : 3) : 1
 	const own = repo.badges ?? []
 	const badges = [...own, ...KINDS.filter(item => item.id !== 'plugins' && b.countOf(repo, item.id) > 0 && !own.some(label => label.toLowerCase() === item.label.toLowerCase())).map(item => item.label)]
 	const details = badges.length
 		? h(
 				View,
 				null,
-				h(Text, { variant: 'text-sm/medium', color: 'text-muted', numberOfLines: lines }, subLabel),
-				h(View, { style: { marginTop: 6 } }, h(RepoBadges, { badges })),
+				subLabel ? h(Text, { variant: 'text-sm/medium', color: 'text-muted', numberOfLines: lines }, subLabel) : null,
+				h(View, { style: { marginTop: subLabel ? 6 : 2 } }, h(RepoBadges, { badges })),
 			)
-		: subLabel
+		: subLabel || undefined
 
 	return h(TableRow, {
 		key: repo.url,
@@ -926,77 +919,55 @@ function SearchPage(b: Ctx) {
 
 function RepoPage(b: Ctx, repo: Repo) {
 	const { Button, Stack, TableRow, TableRowGroup, TableSwitchRow, Text } = Design
-	const { Linking } = ReactNative
+	const { View } = ReactNative
 	const tab = b.repoKind
 	const listing = listings.get(repo.url)
 	const entry = b.addedRepo(repo.url)
 	const visible = b.sortPlugins((listing?.plugins ?? []).filter(plugin => b.inKind(repo, plugin, tab) && b.pluginMatches(plugin)).map(plugin => ({ repo, plugin })))
 
-	let lastUpdated: string | undefined
-	if (!b.reloadingRepo) {
-		if (listing?.err) lastUpdated = friendlyError(listing.err)
-		else if (listing?.at) lastUpdated = `${listing.stale ? 'Last updated' : 'Updated'} ${ago(listing.at)}`
-	}
-
-	const header = h(TableRowGroup, { key: 'info', title: listing?.name ?? repo.url, description: [hostOf(repo.url), listing?.description, repo.builtIn ? BUILT_IN_NOTE : undefined].filter(Boolean).join('\n') }, [
-		h(TableRow, { key: 'back', label: 'Back', icon: icon('ArrowLargeLeftIcon'), onPress: b.showList }),
-		h(TableRow, {
-			key: 'author',
-			label: (repo.discord && b.authorNames[repo.discord]) || repoOwner(repo),
-			subLabel: 'Author',
-			icon: h(RepoAvatar, { repo, listing, epoch: b.epoch, person: true }),
-			arrow: !!repo.discord,
-			onPress: repo.discord ? () => openUserProfile(repo.discord!) : undefined,
-		}),
-		repo.builtIn
-			? h(TableRow, { key: 'repo', label: 'Built in', subLabel: 'Always on, it can\'t be turned off or removed', icon: icon('CircleCheckIcon') })
-			: entry
-				? h(TableSwitchRow, {
-					key: 'repo',
-					label: entry.enabled ? 'Repository enabled' : 'Repository disabled',
-					subLabel: entry.enabled ? 'Added to Valenced' : 'Turn on to install its plugins',
-					icon: icon(entry.enabled ? 'CircleCheckIcon' : 'CircleXIcon'),
-					value: entry.enabled,
-					onValueChange: (value: boolean) => putRepos(entry.url, value).then(b.syncState).catch(fail),
-				})
-			: h(TableRow, {
-					key: 'repo',
-					label: 'Add to Valenced',
-					subLabel: repo.url,
-					icon: icon('DownloadIcon'),
-					arrow: true,
-					onPress: () => putRepos(slash(repo.url), true).then(b.syncState).catch(fail),
-				}),
-		h(TableRow, {
-			key: 'link',
-			label: repo.source ? 'Source' : 'Website',
-			subLabel: repo.source ?? repo.url,
-			icon: icon(repo.source ? 'PaperIcon' : 'GlobeEarthIcon'),
-			arrow: true,
-			onPress: () => Linking.openURL(repo.source ?? repo.url),
-		}),
-		h(TableRow, {
-			key: 'alerts',
-			label: 'Notifications',
-			subLabel: ALERT_MODES[b.alertMode(repo.url)].summary,
-			icon: icon('BellIcon'),
-			arrow: true,
-			onPress: () => b.chooseAlerts(repo),
-		}),
-		h(TableRow, {
-			key: 'refresh',
-			label: b.reloadingRepo ? 'Refreshing...' : 'Refresh',
-			subLabel: lastUpdated,
-			icon: icon('RetryIcon'),
-			disabled: b.reloadingRepo,
-			onPress: b.refreshCurrent,
-		}),
-	])
+	const subtitle = [hostOf(repo.url), listing?.description].filter(Boolean).join(' \u2022 ')
+	const header = [
+		h(
+			View,
+			{ key: 'title', style: { gap: 2 } },
+			h(Text, { variant: 'heading-md/semibold' }, listing?.name ?? repo.url),
+			subtitle ? h(Text, { variant: 'text-sm/medium', color: 'text-muted', numberOfLines: 2 }, subtitle) : null,
+		),
+		h(TableRowGroup, { key: 'info' }, [
+			h(TableRow, {
+				key: 'author',
+				label: (repo.discord && b.authorNames[repo.discord]) || repoOwner(repo),
+				subLabel: 'Author',
+				icon: h(RepoAvatar, { repo, listing, epoch: b.epoch, person: true }),
+				arrow: !!repo.discord,
+				onPress: repo.discord ? () => openUserProfile(repo.discord!) : undefined,
+			}),
+			repo.builtIn
+				? h(TableRow, { key: 'repo', label: 'Built in', subLabel: 'Always on, it can\'t be turned off or removed', icon: icon('CircleCheckIcon') })
+				: entry
+					? h(TableSwitchRow, {
+						key: 'repo',
+						label: entry.enabled ? 'Repository enabled' : 'Repository disabled',
+						subLabel: entry.enabled ? 'Added to Valenced' : 'Turn on to install its plugins',
+						icon: icon(entry.enabled ? 'CircleCheckIcon' : 'CircleXIcon'),
+						value: entry.enabled,
+						onValueChange: (value: boolean) => putRepos(entry.url, value).then(b.syncState).catch(fail),
+					})
+				: h(TableRow, {
+						key: 'repo',
+						label: 'Add to Valenced',
+						subLabel: repo.url,
+						icon: icon('DownloadIcon'),
+						arrow: true,
+						onPress: () => putRepos(slash(repo.url), true).then(b.syncState).catch(fail),
+					}),
+		]),
+	]
 
 	if (listing?.err) {
 		const message = `Failed to load: ${friendlyError(listing.err)}. Use Refresh above to try again.`
 		return [
-			header,
+			...header,
 			h(Text, { key: 'err', variant: 'text-md/medium' }, message),
 			listing.tooLarge ? h(Button, { key: 'large', text: 'Load anyway', variant: 'secondary', onPress: () => b.loadAnyway(repo, true) }) : null,
 		]
@@ -1006,15 +977,25 @@ function RepoPage(b: Ctx, repo: Repo) {
 	const switcher = others.length
 		? h(
 				TableRowGroup,
-				{ key: 'kinds', title: 'Also in this repository' },
-				others.map(item =>
-					h(TableRow, { key: item.id, label: pluralKind(item.id, b.countOf(repo, item.id)), subLabel: `Show its ${item.plural}`, arrow: true, onPress: () => b.setRepoKind(item.id) }),
-				),
+				{ key: 'kinds' },
+				h(TableRow, {
+					label: 'Also in this repository',
+					subLabel: others.map(item => pluralKind(item.id, b.countOf(repo, item.id))).join(' \u00b7 '),
+					icon: icon('ImageIcon'),
+					arrow: true,
+					onPress: () =>
+						others.length === 1
+							? b.setRepoKind(others[0].id)
+							: openKindsSheet({
+									kinds: others.map(item => ({ id: item.id, title: pluralKind(item.id, b.countOf(repo, item.id)), subLabel: `Show its ${item.plural}` })),
+									onSelect: b.setRepoKind,
+								}),
+				}),
 			)
 		: null
 
 	return [
-		header,
+		...header,
 		switcher,
 		h(
 			Stack,

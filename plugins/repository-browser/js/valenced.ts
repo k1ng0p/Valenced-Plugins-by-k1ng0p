@@ -332,7 +332,7 @@ export async function toggleMany(ids: string[], on: boolean) {
 	if (lastError && failed.length) reportError(lastError, `${word} plugins`)
 	if (done.length) {
 		tap()
-
+		// Valenced shows its own reload dialog for plugins it flags as needing one, so ours would be a second popup
 		const hostPrompts = !on && (await readState().then(state => done.some(id => state.enabled[id]?.pendingReload)).catch(() => false))
 		if (!hostPrompts) askReload(`${on ? 'Enabled' : 'Disabled'} ${done.length} plugin${done.length === 1 ? '' : 's'}${failed.length ? `, ${failed.length} could not be changed` : ''}. Reload to apply it.`)
 	} else if (lastError) {

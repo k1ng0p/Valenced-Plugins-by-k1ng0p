@@ -7,18 +7,20 @@ import { ReactNativeSafeAreaContext } from '@valenced/externals/react-native-saf
 import { parsePluginContributor } from '@valenced/plugins/utils'
 import { React, ReactNative } from '@valenced/react'
 import { lookupGeneratedIconComponent } from '@valenced/utils/discord'
-import { catalog, dependentsOf, isLegacy, listings, missingDependencies, openUserProfile } from './data'
+import { catalog, dependentsOf, isLegacy, listings, missingDependencies, openUserProfile, setAlertMode, setKindMuted } from './data'
 import { available, blocked, checkInstall, install, openPluginSettings, pendingReload, putRepos, readState, setHeld, toggle, uninstall, updatePlugins } from './valenced'
 import type { BulkItem } from './valenced'
 import type { ValencedState } from './valenced'
-import { ICON_INDENT, asset, isBuiltIn, compatibilityWarning, copyToClipboard, fail, formatBytes, h, icon, iconSlot, native, reportError, slash } from './shared'
-import type { ListedPlugin, PluginRef, Repo, RepoListing } from './shared'
+import { ALERT_MODES, ICON_INDENT, asset, isBuiltIn, compatibilityWarning, copyToClipboard, fail, formatBytes, h, icon, iconSlot, native, reportError, slash } from './shared'
+import type { AlertMode, ListedPlugin, PluginKind, PluginRef, Repo, RepoListing } from './shared'
 
 const PLUGIN_SHEET = 'plugin-browser-plugin-sheet'
 const PICKER_SHEET = 'plugin-browser-ref-picker'
 const REPO_SHEET = 'plugin-browser-repo-picker'
 const CONTRIBUTORS_SHEET = 'plugin-browser-contributors'
 const BULK_SHEET = 'plugin-browser-bulk-install'
+const REPO_INFO_SHEET = 'plugin-browser-repo-info'
+const KINDS_SHEET = 'plugin-browser-repo-kinds'
 
 const MAX_GROWING_TABS = 3
 const MAX_SHOWN_ENTRIES = 5
@@ -389,6 +391,101 @@ function RepoPickerSheet({ id, name, repo, onSelect }: RepoPickerProps) {
 		),
 	)
 }
+
+type RepoInfoProps = { repo: Repo; name: string; updated?: string; note?: string; kinds: { id: PluginKind; label: string }[]; mode: AlertMode; muted: PluginKind[] }
+
+// where a repository comes from and what it should notify about, kept off the repository page itself
+function RepoInfoSheet({ repo, name, updated, note, kinds, mode, muted }: RepoInfoProps) {
+	const { Linking } = ReactNative
+	const { BottomSheet, BottomSheetTitleHeader, Stack, TableRadioGroup, TableRadioRow, TableRow, TableRowGroup, TableSwitchRow } = Design
+	const [selected, setSelected] = React.useState(mode)
+	const [off, setOff] = React.useState(muted)
+	const link = repo.source ?? repo.url
+
+	return h(
+		BottomSheet,
+		{ scrollable: true, header: h(BottomSheetTitleHeader, { title: name }) },
+		h(
+			RefPage,
+			{ empty: '' },
+			h(
+				Stack,
+				{ spacing: 16 },
+			h(
+				TableRowGroup,
+				{ title: repo.source ? 'Source' : 'Website', description: [updated, note].filter(Boolean).join('\n') || undefined },
+				h(TableRow, { label: repo.source ? 'Source' : 'Website', subLabel: link, icon: icon(repo.source ? 'PaperIcon' : 'GlobeEarthIcon'), arrow: true, onPress: () => Linking.openURL(link) }),
+			),
+			h(
+				TableRadioGroup,
+				{
+					title: 'Notifications',
+					description: 'Choose what this repository adds to the red count on the settings row.',
+					value: selected,
+					onChange: (value: AlertMode) => {
+						setSelected(value)
+						setAlertMode(repo.url, value)
+					},
+				},
+				...(Object.entries(ALERT_MODES) as [AlertMode, (typeof ALERT_MODES)[AlertMode]][]).map(([value, { button }]) => h(TableRadioRow, { key: value, label: button, value })),
+			),
+			kinds.length > 1
+				? h(
+						TableRowGroup,
+						{ title: 'Notify about' },
+						kinds.map(kind =>
+							h(TableSwitchRow, {
+								key: kind.id,
+								label: kind.label,
+								value: !off.includes(kind.id),
+								onValueChange: (value: boolean) => {
+									setOff(value ? off.filter(item => item !== kind.id) : [...off, kind.id])
+									setKindMuted(repo.url, kind.id, !value)
+								},
+							}),
+						),
+					)
+				: null,
+			),
+		),
+	)
+}
+
+type KindsProps = { kinds: { id: PluginKind; title: string; subLabel: string }[]; onSelect: (kind: PluginKind) => void }
+
+// the other kinds a repository offers, picking one takes you to it
+function KindsSheet({ kinds, onSelect }: KindsProps) {
+	const { BottomSheet, BottomSheetTitleHeader, TableRow, TableRowGroup } = Design
+
+	return h(
+		BottomSheet,
+		{ scrollable: true, header: h(BottomSheetTitleHeader, { title: 'Also in this repository' }) },
+		h(
+			RefPage,
+			{ empty: 'Nothing else is listed here.' },
+			h(
+				TableRowGroup,
+				{},
+				kinds.map(kind =>
+					h(TableRow, {
+						key: kind.id,
+						label: kind.title,
+						subLabel: kind.subLabel,
+						arrow: true,
+						onPress: () => {
+							ActionSheetActionCreators.hideActionSheet(KINDS_SHEET)
+							onSelect(kind.id)
+						},
+					}),
+				),
+			),
+		),
+	)
+}
+
+export const openKindsSheet = (props: KindsProps) => ActionSheetActionCreators.openLazy(Promise.resolve({ default: KindsSheet }), KINDS_SHEET, props)
+
+export const openRepoInfoSheet = (props: RepoInfoProps) => ActionSheetActionCreators.openLazy(Promise.resolve({ default: RepoInfoSheet }), REPO_INFO_SHEET, props)
 
 const openRefPicker = (props: RefPickerProps) => ActionSheetActionCreators.openLazy(Promise.resolve({ default: RefPickerSheet }), PICKER_SHEET, props, 'stack')
 const openRepoPicker = (props: RepoPickerProps) => ActionSheetActionCreators.openLazy(Promise.resolve({ default: RepoPickerSheet }), REPO_SHEET, props, 'stack')

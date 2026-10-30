@@ -67,6 +67,12 @@
       "badges": ["Trusted", "Themes", "icons"]
     },
     {
+      "url": "https://caramel3625.github.io/valenced-plugins/",
+      "source": "https://github.com/caramel3625/valenced-plugins",
+      "discord": "295308882446647300",
+      "badges": ["Themes", "Fonts"]
+    },
+    {
       "url": "https://noreplyui5.github.io/valenced-plugin/",
       "source": "https://github.com/NoReplyUI5/valenced-plugin",
       "discord": "1053918356375351386",
@@ -89,6 +95,12 @@
       "source": "https://github.com/LisaExists/valenced-plugins",
       "discord": "836161010053283890",
       "badges": ["Ports"]
+    },
+    {
+      "url": "https://valenced-plugins.655.workers.dev/index.json",
+      "source": "https://github.com/6-5-5/valenced-plugins",
+      "discord": "783754042476068914",
+      "badges": ["Utility"]
     },
     {
       "url": "https://otkusteyler.github.io/btmc727-s-Valenced-plugins-/",

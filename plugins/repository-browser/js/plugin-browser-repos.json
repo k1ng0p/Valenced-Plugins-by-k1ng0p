@@ -61,6 +61,12 @@
       "badges": ["Trusted", "Developer", "Ports", "Themes"]
     },
     {
+      "url": "https://valenced.mudrhiod.me/",
+      "source": "https://github.com/mudrhiod/valenced-plugins",
+      "discord": "807170846497570848",
+      "badges": ["Trusted", "Themes", "icons"]
+    },
+    {
       "url": "https://noreplyui5.github.io/valenced-plugin/",
       "source": "https://github.com/NoReplyUI5/valenced-plugin",
       "discord": "1053918356375351386",

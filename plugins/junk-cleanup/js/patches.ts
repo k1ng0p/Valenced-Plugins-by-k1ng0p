@@ -530,6 +530,8 @@ function componentRules(env: Env) {
 
 /** Message long-press rows by the icon each one is given */
 const MESSAGE_ROW_ICONS = new Map<string, OptionKey>([
+	['ArrowAngleLeftUpIcon', 'msgReply'],
+	['PencilIcon', 'msgEdit'],
 	['ForwardingIcon', 'msgForward'],
 	['ThreadIcon', 'msgThread'],
 	['ChatMarkUnreadIcon', 'msgMarkUnread'],
@@ -545,6 +547,9 @@ const MESSAGE_ROW_ICONS = new Map<string, OptionKey>([
 	['FlagIcon', 'msgReport'],
 ])
 
+/** Icons that other plugins reuse in the same sheet */
+const SHARED_ICONS = new Set(['CopyIcon', 'PencilIcon'])
+
 /** True when the row being created was built by Discord's own message sheet */
 function builtByMessageSheet(): boolean {
 	return (new Error().stack ?? '').includes('LongPressMessageActionSheet')
@@ -558,11 +563,11 @@ function messageRows(env: Env) {
 					if (ui.messageSheetOpen && !ui.settingsOpen) {
 						const icon = iconComponentName(args[1])
 						const option = icon ? MESSAGE_ROW_ICONS.get(icon) : undefined
-						// Copy User ID shares this icon but comes from another plugin
+						// Copy User ID and Local Edit Message come from other plugins
 						if (
 							option &&
 							isOn(option) &&
-							(icon !== 'CopyIcon' || builtByMessageSheet())
+							(!icon || !SHARED_ICONS.has(icon) || builtByMessageSheet())
 						)
 							return null
 					}

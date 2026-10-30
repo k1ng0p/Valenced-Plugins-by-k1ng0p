@@ -72,6 +72,8 @@ export const GROUPS = [
 				label: 'Reaction row',
 				hint: 'Emoji reactions at the top of the long-press menu',
 			},
+			{ key: 'msgReply', label: 'Reply', hint: 'Long-press menu row' },
+			{ key: 'msgEdit', label: 'Edit Message', hint: 'Long-press menu row' },
 			{ key: 'msgForward', label: 'Forward', hint: 'Long-press menu row' },
 			{
 				key: 'msgThread',

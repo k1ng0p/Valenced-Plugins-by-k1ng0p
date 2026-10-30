@@ -97,12 +97,6 @@
       "badges": ["Ports"]
     },
     {
-      "url": "https://valenced-plugins.655.workers.dev/index.json",
-      "source": "https://github.com/6-5-5/valenced-plugins",
-      "discord": "783754042476068914",
-      "badges": ["Utility"]
-    },
-    {
       "url": "https://otkusteyler.github.io/btmc727-s-Valenced-plugins-/",
       "source": "https://github.com/OTKUSteyler/btmc727-s-Valenced-plugins-",
       "discord": "554071670143451176",

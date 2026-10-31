@@ -806,7 +806,7 @@ function repoRow(b: Ctx, repo: Repo, tab?: PluginKind) {
 	return h(TableRow, {
 		key: repo.url,
 		icon: h(RepoAvatar, { repo, listing, epoch: b.epoch }),
-		label: b.repoName(repo),
+		label: b.addedRepo(repo.url)?.enabled ? h(Text, { variant: 'text-md/semibold', numberOfLines: 1, style: { color: '#4ADE80' } }, b.repoName(repo)) : b.repoName(repo),
 		subLabel: details,
 		labelLineClamp: 1,
 		subLabelLineClamp: lines,

@@ -2,7 +2,7 @@ import { RootNavigationRef } from '@valenced/discord/modules/main_tabs_v2'
 import { formatVersion } from '@valenced/plugins/utils'
 import { BUILT_IN_REPO, askReload, asObject, clearProblems, confirm, errorMessage, fail, logProblem, native, reportError, showError, slash, tap, usesEnvelope } from './shared'
 import type { AvailableUpdate, ListedPlugin, PluginRef, Repo, ValencedRepo } from './shared'
-export type PendingUpdate = { id: string; name: string; installed: string; available: string; channel: string }
+type PendingUpdate = { id: string; name: string; installed: string; available: string; channel: string }
 export type ValencedState = Awaited<ReturnType<typeof readState>>
 
 export const available = new Map<string, AvailableUpdate>()
@@ -188,7 +188,6 @@ export const setHeld = (id: string, held: boolean) =>
 // the plugin comes from the chosen repository, what it depends on from any repository added to Valenced
 const planTarget = (id: string, repo: string, target?: { version: string } | { channel: string }) => ({ targets: { [id]: { repo, ...target } } })
 
-// asks Valenced whether a plugin can be installed, so the reason shows before anyone taps Install
 export async function checkInstall(repoUrl: string, plugin: ListedPlugin, ref?: PluginRef) {
 	try {
 		const known = (await repoList()).find(repo => slash(repo.url) === slash(repoUrl))

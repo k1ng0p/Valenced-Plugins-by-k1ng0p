@@ -3,16 +3,14 @@ import { Design } from '@valenced/discord/design'
 import { ReactNativeSafeAreaContext } from '@valenced/externals/react-native-safe-area-context'
 import { ReactNavigationNative } from '@valenced/externals/react-navigation'
 import { React, ReactNative } from '@valenced/react'
-import { CountsCard, FeedSection, NoteBanner, Notice, PluginCard, TipNote, RepoAvatar, RepoBadges } from './components'
-import { openBulkInstallSheet, openKindsSheet, openRepoInfoSheet, openBulkUninstallSheet, openPluginSheet } from './sheets'
+import { CountsCard, NoteBanner, Notice, PluginCard, TipNote, RepoAvatar, RepoBadges } from './components'
+import { openBulkInstallSheet, openAboutSheet, openFeedSheet, openKindsSheet, openRepoInfoSheet, openBulkUninstallSheet, openPluginSheet } from './sheets'
 import type { CardUpdate } from './components'
 import {
 	catalog,
 	checkUpdates,
 	dependentsOf,
 	discordUser,
-	dismiss,
-	dismissAll,
 	allowLarge,
 	dismissRepo,
 	freshAvatarEpoch,
@@ -22,15 +20,17 @@ import {
 	openUserProfile,
 	parseAuthor,
 	pendingByKind,
+	readStore,
 	repoOwner,
 	save,
 	useStore,
 } from './data'
 import type { SeenEntry } from './data'
+import type { FeedItem, UpdateItem } from './sheets'
 import { THEMES_SETTINGS, THEME_SUPPORT, available, blocked, checkInstall, install, installMany, openPluginSettings, pendingReload, putRepos, readState, toggle, toggleMany, uninstall, uninstallMany, updatePlugins } from './valenced'
 import type { BulkItem } from './valenced'
 import type { ValencedState } from './valenced'
-import { BUILT_IN_NOTE, SELF_ID, confirm, setHaptics, tap, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
+import { BUILT_IN_NOTE, OWNER_ID, SELF_ID, SOURCE_URL, confirm, setHaptics, tap, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
 import type { AlertMode, AvailableUpdate, ListedPlugin, PluginKind, Repo, SortKey } from './shared'
 
 type Hit = { repo: Repo; plugin: ListedPlugin }
@@ -170,7 +170,6 @@ function useBrowser() {
 	const selecting = Object.keys(selection).length > 0
 	const navigation = React.useContext(ReactNavigationNative.NavigationContext) as ScreenNavigation | undefined
 
-	// settings open from the header on the main list, like the built-in plugins page
 	const onMain = !current && !settingsOpen
 	React.useEffect(() => {
 		if (!navigation || !onMain) return
@@ -223,6 +222,21 @@ function useBrowser() {
 		}
 		return id
 	}
+
+	const openAbout = () =>
+		openAboutSheet({
+			name: authorNames[OWNER_ID] || 'k1ng_op',
+			avatar: h(RepoAvatar, { repo: { url: SOURCE_URL, discord: OWNER_ID }, epoch, person: true }),
+			overview: () => ({
+				stats: [
+					{ label: 'Repositories', value: catalog.length },
+					...KINDS.map(kind => ({ label: kind.label, value: catalog.reduce((total, repo) => total + countOf(repo, kind.id), 0) })),
+					{ label: 'Installed', value: state?.installed.size ?? 0 },
+					{ label: 'Updates', value: available.size },
+				],
+				loading: catalog.filter(repo => !listings.get(repo.url)).length,
+			}),
+		})
 
 	const openRepoInfo = (repo: Repo) => {
 		const listing = listings.get(repo.url)
@@ -407,7 +421,31 @@ function useBrowser() {
 		})
 	}
 
-	// the first plugin picked decides whether the selection installs or uninstalls
+	const withBusy = async (run: () => Promise<unknown>) => {
+		setBulkBusy(true)
+		try {
+			await run()
+			await syncState()
+		} finally {
+			setBulkBusy(false)
+		}
+	}
+
+	const selectedItems = (installed: boolean): BulkItem[] =>
+		(Object.values(selection) as Hit[])
+			.filter(({ plugin }) => !!state?.installed.has(plugin.id) === installed)
+			.map(({ repo, plugin }) => ({
+				id: plugin.id,
+				name: plugin.name,
+				repo: repo.url,
+				repoName: repoName(repo),
+				version: state?.installed.get(plugin.id)?.version ?? plugin.version,
+				size: plugin.size,
+				description: plugin.description,
+				icon: plugin.icon,
+			}))
+
+	// the first plugin picked decides what the rest of the selection can do
 	const firstPicked = selecting ? Object.keys(selection)[0] : undefined
 	const selectionMode = selecting ? (state?.installed.has(firstPicked!) ? (state.enabled[firstPicked!]?.enabled ? 'enabled' : 'disabled') : 'install') : null
 
@@ -420,19 +458,14 @@ function useBrowser() {
 			return
 		}
 
-		setBulkBusy(true)
-		try {
+		await withBusy(async () => {
 			if ((await toggleMany(ids, on)).length) setSelection({})
-			await syncState()
-		} finally {
-			setBulkBusy(false)
-		}
+		})
 	}
 
 	const changeDisableAll = async (value: boolean) => {
 		if (bulkBusy || !state) return
-		setBulkBusy(true)
-		try {
+		await withBusy(async () => {
 			if (value) {
 				const ids = [...state.installed.keys()].filter(id => id !== SELF_ID && state.enabled[id]?.enabled)
 				if (!ids.length) {
@@ -448,26 +481,12 @@ function useBrowser() {
 				const rest = ids.filter(id => !done.includes(id))
 				save({ disabledAll: rest.length ? rest : undefined })
 			}
-			await syncState()
-		} finally {
-			setBulkBusy(false)
-		}
+		})
 	}
 
 	const uninstallSelected = async () => {
 		if (bulkBusy || !state) return
-		const items: BulkItem[] = (Object.values(selection) as Hit[])
-			.filter(({ plugin }) => state.installed.has(plugin.id))
-			.map(({ repo, plugin }) => ({
-				id: plugin.id,
-				name: plugin.name,
-				repo: repo.url,
-				repoName: repoName(repo),
-				version: state.installed.get(plugin.id)?.version ?? plugin.version,
-				size: plugin.size,
-				description: plugin.description,
-				icon: plugin.icon,
-			}))
+		const items = selectedItems(true)
 		if (!items.length) {
 			setSelection({})
 			return
@@ -478,29 +497,14 @@ function useBrowser() {
 		const warning = dependents.length ? `Required by: ${dependents.join(', ')}. Removing them may break these.` : undefined
 		if (!(await openBulkUninstallSheet(items, warning))) return
 
-		setBulkBusy(true)
-		try {
+		await withBusy(async () => {
 			if (await uninstallMany(items)) setSelection({})
-			await syncState()
-		} finally {
-			setBulkBusy(false)
-		}
+		})
 	}
 
 	const installSelected = async () => {
 		if (bulkBusy) return
-		const items: BulkItem[] = (Object.values(selection) as Hit[])
-			.filter(({ plugin }) => !state?.installed.has(plugin.id))
-			.map(({ repo, plugin }) => ({
-				id: plugin.id,
-				name: plugin.name,
-				repo: repo.url,
-				repoName: repoName(repo),
-				version: plugin.version,
-				size: plugin.size,
-				description: plugin.description,
-				icon: plugin.icon,
-			}))
+		const items = selectedItems(false)
 		if (!items.length) {
 			setSelection({})
 			return
@@ -509,13 +513,9 @@ function useBrowser() {
 		const missing = [...new Set(items.filter(item => !addedRepo(item.repo)?.enabled).map(item => item.repoName))]
 		if (!(await openBulkInstallSheet(items, missing))) return
 
-		setBulkBusy(true)
-		try {
+		await withBusy(async () => {
 			if (await installMany(items)) setSelection({})
-			await syncState()
-		} finally {
-			setBulkBusy(false)
-		}
+		})
 	}
 
 	const pluginCard = (repo: Repo, plugin: ListedPlugin, fromSearch = false) => {
@@ -615,12 +615,11 @@ function useBrowser() {
 					onPress: current ? refreshCurrent : refreshAll,
 				}),
 			),
-			current &&
-				h(
-					View,
-					{ style: { marginLeft: 8 } },
-					h(IconButton, { size: 'md', variant: 'secondary', icon: asset('CircleInformationIcon') ?? asset('InfoIcon'), onPress: () => openRepoInfo(current) }),
-				),
+			h(
+				View,
+				{ style: { marginLeft: 8 } },
+				h(IconButton, { size: 'md', variant: 'secondary', icon: asset('CircleInformationIcon') ?? asset('InfoIcon'), onPress: () => (current ? openRepoInfo(current) : openAbout()) }),
+			),
 			h(
 				View,
 				{ style: { marginLeft: 8 } },
@@ -682,40 +681,28 @@ function useBrowser() {
 		changeCompact,
 		setSelection,
 		installSelected,
-		updatingIds,
 		authorNames,
 		state,
-		installing,
 		sort,
-		setSort,
 		limit,
 		refreshing,
 		retrying,
-		reloadingRepo,
 		booting,
 		epoch,
 		needle,
 		syncState,
-		afterToggle,
 		refreshAll,
-		refreshCurrent,
-		retry,
 		loadAnyway,
 		showRepo,
 		showList,
-		isEnabled,
 		addedRepo,
 		repoName,
-		alertMode,
-		openRepoInfo,
 		runUpdate,
 		matches,
 		pluginMatches,
 		pluginRank,
 		repoRank,
 		sortPlugins,
-		installPlugin,
-		removePlugin,
 		pluginCard,
 		moreButton,
 		controls,
@@ -727,74 +714,57 @@ function useBrowser() {
 const kindInfoOf = (tab: PluginKind) => KINDS.find(item => item.id === tab)!
 const pluralKind = (tab: PluginKind, count: number) => `${count} ${count === 1 ? kindInfoOf(tab).singular : kindInfoOf(tab).plural}`
 
-function feed(b: Ctx, tab: PluginKind, type: 'news' | 'updates', title: string) {
-	const { TableRow, TableRowGroup } = Design
-	const items = catalog
-		.flatMap(repo => Object.entries<any>(b.seen[repo.url]?.[type] ?? {}).map(([id, value]) => ({ repo, id, value, at: type === 'news' ? (value as number) : value.at })))
-		.filter(item => {
-			const listed = listings.get(item.repo.url)?.plugins.find(plugin => plugin.id === item.id)
-			if (!listed || !b.inKind(item.repo, listed, tab)) return false
-			if (type === 'news') return true
-			return Date.now() - item.at < DAY && !b.seen[item.repo.url].news?.[item.id]
+function feedItems(b: Ctx, tab: PluginKind, type: 'news' | 'updates'): FeedItem[] {
+	const seen = readStore().seen
+	return catalog
+		.flatMap(repo => Object.entries<any>(seen[repo.url]?.[type] ?? {}).map(([id, value]) => ({ repo, id, value, at: type === 'news' ? (value as number) : value.at })))
+		.flatMap(item => {
+			const plugin = listings.get(item.repo.url)?.plugins.find(listed => listed.id === item.id)
+			if (!plugin || !b.inKind(item.repo, plugin, tab)) return []
+			if (type === 'updates' && (Date.now() - item.at >= DAY || seen[item.repo.url].news?.[item.id])) return []
+			return [{ repo: item.repo, plugin, at: item.at, from: item.value?.from, to: item.value?.to }]
 		})
 		.sort((a, c) => c.at - a.at)
-	if (!items.length) return null
-
-	const rows = items.map(({ repo, id, value, at }) => {
-		const listing = listings.get(repo.url)!
-		const plugin = listing.plugins.find(item => item.id === id)!
-		const note = type === 'news' ? `New in ${listing.name}` : `Updated in ${listing.name}\n${value.from} to ${value.to}`
-		return h(TableRow, {
-			key: `${type}:${repo.url}#${id}`,
-			icon: icon(plugin.icon, 'PuzzlePieceIcon'),
-			label: plugin.name,
-			subLabel: `${note}\n${ago(at)}`,
-			subLabelLineClamp: 3,
-			arrow: true,
-			onPress: () => {
-				dismiss(type, repo.url, id)
-				b.showRepo(repo)
-			},
-		})
-	})
-	return h(FeedSection, { key: type, title, onAction: () => dismissAll(type) }, h(TableRowGroup, null, rows))
 }
 
-function updatesSection(b: Ctx, tab: PluginKind) {
+function feedRow(b: Ctx, tab: PluginKind) {
 	const { TableRow, TableRowGroup } = Design
-	const items = [...available.values()].filter(info => {
-		const repo = catalog.find(item => item.url === info.repo)
-		const listed = repo && listings.get(repo.url)?.plugins.find(plugin => plugin.id === info.id)
-		return b.state?.installed.has(info.id) && !pendingReload.has(info.id) && !!listed && b.inKind(repo, listed, tab)
-	})
-	if (!items.length) return null
+	const waiting = updateItems(b, tab).length
+	const added = feedItems(b, tab, 'news').length
+	const updated = feedItems(b, tab, 'updates').length
+	if (!waiting && !added && !updated) return null
 
-	const rows = items.map(info => {
-		const repo = catalog.find(item => item.url === info.repo)!
-		const listed = listings.get(repo.url)?.plugins.find(plugin => plugin.id === info.id)
-		return h(TableRow, {
-			key: `update:${info.id}`,
-			icon: icon(listed?.icon, 'PuzzlePieceIcon'),
-			label: listed?.name ?? info.id,
-			subLabel: `${info.installed} to ${info.available}\nfrom ${b.repoName(repo)}`,
-			subLabelLineClamp: 2,
-			arrow: true,
-			onPress: listed ? () => openPluginSheet({ repo, plugin: listed, onChange: b.syncState }) : undefined,
-		})
-	})
-
+	const newsTitle = `New ${kindInfoOf(tab).plural}`
+	const recent = added && updated ? 'New and recently updated' : added ? newsTitle : 'Recently updated'
 	return h(
-		FeedSection,
-		{
-			key: 'available',
-			title: 'Updates available',
-			action: 'Update all',
-			variant: 'primary',
-			loading: b.updatingIds.length > 0,
-			onAction: () => b.runUpdate(items.map(info => info.id)),
-		},
-		h(TableRowGroup, null, rows),
+		TableRowGroup,
+		{ key: 'feed' },
+		h(TableRow, {
+			label: waiting && (added || updated) ? "Updates and what's new" : waiting ? 'Updates available' : recent,
+			subLabel: [waiting ? `${waiting} to update` : '', added ? `${added} new` : '', updated ? `${updated} updated` : ''].filter(Boolean).join(' \u2022 '),
+			icon: icon(waiting ? 'DownloadIcon' : 'BellIcon'),
+			arrow: true,
+			onPress: () =>
+				openFeedSheet({
+					newsTitle,
+					load: type => feedItems(b, tab, type),
+					updates: () => updateItems(b, tab),
+					repoName: b.repoName,
+					onOpen: b.showRepo,
+					onUpdate: b.runUpdate,
+					onOpenPlugin: (repo, plugin) => openPluginSheet({ repo, plugin, onChange: b.syncState }),
+				}),
+		}),
 	)
+}
+
+function updateItems(b: Ctx, tab: PluginKind): UpdateItem[] {
+	return [...available.values()].flatMap(info => {
+		const repo = catalog.find(item => item.url === info.repo)
+		const plugin = repo && listings.get(repo.url)?.plugins.find(listed => listed.id === info.id)
+		if (!repo || !plugin || !b.state?.installed.has(info.id) || pendingReload.has(info.id) || !b.inKind(repo, plugin, tab)) return []
+		return [{ repo, plugin, from: info.installed, to: info.available }]
+	})
 }
 
 function repoRow(b: Ctx, repo: Repo, tab?: PluginKind) {
@@ -809,9 +779,17 @@ function repoRow(b: Ctx, repo: Repo, tab?: PluginKind) {
 	else if (listing) subLabel = listing.description ?? ''
 	if (b.newRepos[repo.url]) subLabel = subLabel ? `New repository\n${subLabel}` : 'New repository'
 
-	let trailing
-	if (failed) trailing = h(Button, { text: listing?.tooLarge ? 'Load anyway' : 'Retry', size: 'sm', variant: 'secondary', loading: b.retrying === repo.url, onPress: () => b.loadAnyway(repo, !!listing?.tooLarge) })
-	else if (listing) trailing = h(TableRow.TrailingText, { text: tab ? `${kindInfoOf(tab).label} \u00b7 ${b.countOf(repo, tab)}` : `${KINDS.reduce((sum, item) => sum + b.countOf(repo, item.id), 0)} listed` })
+	const total = () => (tab ? b.countOf(repo, tab) : KINDS.reduce((sum, item) => sum + b.countOf(repo, item.id), 0))
+	const trailing = failed
+		? h(Button, { text: listing?.tooLarge ? 'Load anyway' : 'Retry', size: 'sm', variant: 'secondary', loading: b.retrying === repo.url, onPress: () => b.loadAnyway(repo, !!listing?.tooLarge) })
+		: listing
+			? h(
+					View,
+					{ style: { alignItems: 'flex-end', flexShrink: 0 } },
+					h(Text, { variant: 'text-md/semibold' }, String(total())),
+					h(Text, { variant: 'text-xs/medium', color: 'text-muted' }, tab ? kindInfoOf(tab).label : 'listed'),
+				)
+			: undefined
 
 	const lines = subLabel ? (b.newRepos[repo.url] ? 4 : 3) : 1
 	const own = repo.badges ?? []
@@ -879,9 +857,7 @@ function MainPage(b: Ctx, tab: PluginKind) {
 			: null,
 		b.note ? h(NoteBanner, { key: 'note', note: b.note }) : null,
 		b.sortNote(repos.map(b.repoRank)),
-		updatesSection(b, tab),
-		feed(b, tab, 'news', `New ${kindInfoOf(tab).plural}`),
-		feed(b, tab, 'updates', 'Recently updated'),
+		feedRow(b, tab),
 		catalog.length ? null : emptyList(b),
 		catalog.length && !repos.length ? h(Text, { key: 'nokind', variant: 'text-md/medium', color: 'text-muted' }, `No ${kindInfoOf(tab).plural} in the listed repositories yet.`) : null,
 		repos.length ? h(TableRowGroup, { key: 'all', title: 'Repositories' }, repos.map(repo => repoRow(b, repo, tab))) : null,
@@ -1088,7 +1064,6 @@ export function Browser() {
 	const [pageSize, setPageSize] = React.useState({ width: 0, height: 0 })
 	const active = Math.max(0, KINDS.findIndex(item => item.id === b.kind))
 
-	// tabs only belong to the main list, an open repository or a search replaces them
 	const tabbed = !b.current && !b.needle
 	const showTabs = tabbed && !b.settingsOpen
 
@@ -1096,7 +1071,6 @@ export function Browser() {
 	// while they are out of sight the pages built last are reused instead of being rendered again
 	const builtPages = React.useRef<Record<string, ReturnType<typeof h>>>({})
 
-	// only the open tab and its neighbours are built, a swipe only ever reaches those
 	const items = KINDS.map(({ id, label }, index) => {
 		const near = Math.abs(index - active) <= 1
 		if (near && showTabs) builtPages.current[id] = h(ScrollView, { style: { flex: 1 } }, h(Stack, { spacing: 16, style: contentStyle }, MainPage(b, id)))

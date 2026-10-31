@@ -7,11 +7,11 @@ import { ReactNativeSafeAreaContext } from '@valenced/externals/react-native-saf
 import { parsePluginContributor } from '@valenced/plugins/utils'
 import { React, ReactNative } from '@valenced/react'
 import { lookupGeneratedIconComponent } from '@valenced/utils/discord'
-import { catalog, dependentsOf, isLegacy, listings, missingDependencies, openUserProfile, setAlertMode, setKindMuted } from './data'
+import { catalog, dependentsOf, dismiss, dismissAll, isLegacy, listings, missingDependencies, openUserProfile, setAlertMode, setKindMuted, useStore } from './data'
 import { available, blocked, checkInstall, install, openPluginSettings, pendingReload, putRepos, readState, setHeld, toggle, uninstall, updatePlugins } from './valenced'
 import type { BulkItem } from './valenced'
 import type { ValencedState } from './valenced'
-import { ALERT_MODES, ICON_INDENT, asset, isBuiltIn, compatibilityWarning, copyToClipboard, fail, formatBytes, h, icon, iconSlot, native, reportError, slash } from './shared'
+import { ALERT_MODES, ICON_INDENT, OWNER_ID, tap, SOURCE_URL, ago, asset, isBuiltIn, compatibilityWarning, copyToClipboard, fail, formatBytes, h, icon, iconSlot, native, reportError, slash } from './shared'
 import type { AlertMode, ListedPlugin, PluginKind, PluginRef, Repo, RepoListing } from './shared'
 
 const PLUGIN_SHEET = 'plugin-browser-plugin-sheet'
@@ -21,6 +21,8 @@ const CONTRIBUTORS_SHEET = 'plugin-browser-contributors'
 const BULK_SHEET = 'plugin-browser-bulk-install'
 const REPO_INFO_SHEET = 'plugin-browser-repo-info'
 const KINDS_SHEET = 'plugin-browser-repo-kinds'
+const FEED_SHEET = 'plugin-browser-feed'
+const ABOUT_SHEET = 'plugin-browser-about'
 
 const MAX_GROWING_TABS = 3
 const MAX_SHOWN_ENTRIES = 5
@@ -130,7 +132,7 @@ const openContacts = (title: string, people: string[]) =>
 	ActionSheetActionCreators.openLazy(Promise.resolve({ default: ContactsSheet }), CONTRIBUTORS_SHEET, { title, people }, 'stack')
 
 // only the author, contributors are shown on their own line
-export function PluginAuthor({ pluginName, author }: { pluginName: string; author: string }) {
+function PluginAuthor({ pluginName, author }: { pluginName: string; author: string }) {
 	const { Pressable } = ReactNative
 	const { Text } = Design
 	const parsed = parsePluginContributor(author)
@@ -153,7 +155,7 @@ export function PluginAuthor({ pluginName, author }: { pluginName: string; autho
 }
 
 // only what the plugin lists as contributors in its manifest
-export function PluginContributors({ pluginName, contributors }: { pluginName: string; contributors: string[] }) {
+function PluginContributors({ pluginName, contributors }: { pluginName: string; contributors: string[] }) {
 	const { Pressable } = ReactNative
 	const { Text } = Design
 
@@ -394,7 +396,6 @@ function RepoPickerSheet({ id, name, repo, onSelect }: RepoPickerProps) {
 
 type RepoInfoProps = { repo: Repo; name: string; updated?: string; note?: string; kinds: { id: PluginKind; label: string }[]; mode: AlertMode; muted: PluginKind[] }
 
-// where a repository comes from and what it should notify about, kept off the repository page itself
 function RepoInfoSheet({ repo, name, updated, note, kinds, mode, muted }: RepoInfoProps) {
 	const { Linking } = ReactNative
 	const { BottomSheet, BottomSheetTitleHeader, Stack, TableRadioGroup, TableRadioRow, TableRow, TableRowGroup, TableSwitchRow } = Design
@@ -453,7 +454,6 @@ function RepoInfoSheet({ repo, name, updated, note, kinds, mode, muted }: RepoIn
 
 type KindsProps = { kinds: { id: PluginKind; title: string; subLabel: string }[]; onSelect: (kind: PluginKind) => void }
 
-// the other kinds a repository offers, picking one takes you to it
 function KindsSheet({ kinds, onSelect }: KindsProps) {
 	const { BottomSheet, BottomSheetTitleHeader, TableRow, TableRowGroup } = Design
 
@@ -482,6 +482,193 @@ function KindsSheet({ kinds, onSelect }: KindsProps) {
 		),
 	)
 }
+
+export type FeedItem = { repo: Repo; plugin: ListedPlugin; at: number; from?: string; to?: string }
+export type UpdateItem = { repo: Repo; plugin: ListedPlugin; from: string; to: string }
+type FeedProps = {
+	newsTitle: string
+	load: (type: 'news' | 'updates') => FeedItem[]
+	updates: () => UpdateItem[]
+	repoName: (repo: Repo) => string
+	onOpen: (repo: Repo) => void
+	onUpdate: (ids: string[]) => Promise<void>
+	onOpenPlugin: (repo: Repo, plugin: ListedPlugin) => void
+}
+
+function FeedSheet({ newsTitle, load, updates, repoName, onOpen, onUpdate, onOpenPlugin }: FeedProps) {
+	const { View } = ReactNative
+	const { BottomSheet, BottomSheetTitleHeader, Button, Stack, TableRow, TableRowGroup, Text } = Design
+	const [busy, setBusy] = React.useState(false)
+	// clearing a section changes the store, which redraws the sheet
+	useStore()
+
+	const block = (key: string, title: string, action: any, rows: any[]) =>
+		h(
+			View,
+			{ key },
+			h(
+				View,
+				{ style: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 } },
+				h(Text, { variant: 'text-md/medium', color: 'text-muted' }, title),
+				action,
+			),
+			h(TableRowGroup, null, rows),
+		)
+
+	const feed = (type: 'news' | 'updates', title: string) => {
+		const items = load(type)
+		if (!items.length) return null
+		return block(
+			type,
+			title,
+			h(Button, { text: 'Clear', size: 'sm', variant: 'tertiary', onPress: () => dismissAll(type) }),
+			items.map(item =>
+				h(TableRow, {
+					key: `${type}:${item.repo.url}#${item.plugin.id}`,
+					icon: icon(item.plugin.icon, 'PuzzlePieceIcon'),
+					label: item.plugin.name,
+					subLabel: `${type === 'news' ? 'New in' : 'Updated in'} ${repoName(item.repo)}\n${type === 'updates' ? `${item.from} to ${item.to}\n` : ''}${ago(item.at)}`,
+					subLabelLineClamp: 3,
+					arrow: true,
+					onPress: () => {
+						dismiss(type, item.repo.url, item.plugin.id)
+						ActionSheetActionCreators.hideActionSheet(FEED_SHEET)
+						onOpen(item.repo)
+					},
+				}),
+			),
+		)
+	}
+
+	const waiting = updates()
+	const available = waiting.length
+		? block(
+				'available',
+				'Updates available',
+				h(Button, {
+					text: 'Update all',
+					size: 'sm',
+					variant: 'primary',
+					loading: busy,
+					disabled: busy,
+					onPress: async () => {
+						setBusy(true)
+						try {
+							await onUpdate(waiting.map(item => item.plugin.id))
+						} finally {
+							setBusy(false)
+						}
+					},
+				}),
+				waiting.map(item =>
+					h(TableRow, {
+						key: `update:${item.plugin.id}`,
+						icon: icon(item.plugin.icon, 'PuzzlePieceIcon'),
+						label: item.plugin.name,
+						subLabel: `${item.from} to ${item.to}\nfrom ${repoName(item.repo)}`,
+						subLabelLineClamp: 2,
+						arrow: true,
+						onPress: () => {
+							ActionSheetActionCreators.hideActionSheet(FEED_SHEET)
+							onOpenPlugin(item.repo, item.plugin)
+						},
+					}),
+				),
+			)
+		: null
+
+	return h(
+		BottomSheet,
+		{ scrollable: true, header: h(BottomSheetTitleHeader, { title: "What's new" }) },
+		h(RefPage, { empty: 'Nothing new right now.' }, h(Stack, { spacing: 16 }, available, feed('news', newsTitle), feed('updates', 'Recently updated'))),
+	)
+}
+
+type AboutProps = { name: string; avatar: ReturnType<typeof h>; overview: () => { stats: { label: string; value: number }[]; loading: number } }
+
+function AboutSheet({ name, avatar, overview }: AboutProps) {
+	const { Linking, View } = ReactNative
+	const { BottomSheet, BottomSheetTitleHeader, Button, Card, Stack, TableRow, TableRowGroup, Text } = Design
+	// the numbers move while repositories load, so the sheet asks again every second
+	const [, redraw] = React.useReducer((count: number) => count + 1, 0)
+	React.useEffect(() => {
+		const timer = setInterval(redraw, 1000)
+		return () => clearInterval(timer)
+	}, [])
+	const { stats, loading } = overview()
+
+	return h(
+		BottomSheet,
+		{ scrollable: true, header: h(BottomSheetTitleHeader, { title: 'Plugin Browser' }) },
+		h(
+			RefPage,
+			{ empty: '' },
+			h(
+				Stack,
+				{ spacing: 16 },
+				h(
+					TableRowGroup,
+					null,
+					h(TableRow, { label: name, subLabel: 'Author', icon: avatar, arrow: true, onPress: () => openUserProfile(OWNER_ID) }),
+					h(TableRow, { label: 'Source', subLabel: SOURCE_URL, subLabelLineClamp: 3, icon: icon('PaperIcon'), arrow: true, onPress: () => Linking.openURL(SOURCE_URL) }),
+				),
+				h(
+					Card,
+					{ border: 'strong', style: { padding: 16 } },
+					h(Text, { variant: 'heading-md/semibold', style: { marginBottom: 12 } }, 'Overview'),
+					// three equal columns, each row the same height, every value centred over its label
+					h(
+						View,
+						{ style: { gap: 16 } },
+						[0, 3].map(start =>
+							h(
+								View,
+								{ key: start, style: { flexDirection: 'row' } },
+								[0, 1, 2].map(offset => {
+									const item = stats[start + offset]
+									return h(
+										View,
+										{ key: offset, style: { flex: 1, alignItems: 'center' } },
+										item ? h(Text, { variant: 'heading-lg/semibold' }, String(item.value)) : null,
+										item ? h(Text, { variant: 'text-xs/medium', color: 'text-muted' }, item.label) : null,
+									)
+								}),
+							),
+						),
+					),
+					loading ? h(Text, { variant: 'text-xs/medium', color: 'text-muted', style: { marginTop: 12, textAlign: 'center' } }, `Loading ${loading} more...`) : null,
+				),
+				h(
+					Card,
+					{ border: 'strong', style: { padding: 16 } },
+					h(Text, { variant: 'heading-md/semibold' }, 'Want your repo in the list?'),
+					h(Text, { variant: 'text-sm/medium', color: 'text-muted', style: { marginTop: 2 } }, "Send me the link on Discord and I'll add it."),
+					h(
+						View,
+						{ style: { flexDirection: 'row', gap: 8, marginTop: 12 } },
+						h(View, { style: { flex: 1 } }, h(Button, { text: 'Message me', variant: 'primary', onPress: () => openUserProfile(OWNER_ID) })),
+						h(
+							View,
+							{ style: { flex: 1 } },
+							h(Button, {
+								text: 'Copy ID',
+								variant: 'secondary',
+								onPress: () => {
+									copyToClipboard(OWNER_ID)
+									tap()
+								},
+							}),
+						),
+					),
+				),
+			),
+		),
+	)
+}
+
+export const openAboutSheet = (props: AboutProps) => ActionSheetActionCreators.openLazy(Promise.resolve({ default: AboutSheet }), ABOUT_SHEET, props)
+
+export const openFeedSheet = (props: FeedProps) => ActionSheetActionCreators.openLazy(Promise.resolve({ default: FeedSheet }), FEED_SHEET, props)
 
 export const openKindsSheet = (props: KindsProps) => ActionSheetActionCreators.openLazy(Promise.resolve({ default: KindsSheet }), KINDS_SHEET, props)
 

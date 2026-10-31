@@ -16,7 +16,7 @@ export type SeenEntry = {
 	ever?: string[]
 }
 
-export type StoreData = {
+type StoreData = {
 	seen: Record<string, SeenEntry>
 	ack: number
 	snaps: Record<string, { at: number; data: Listing }>
@@ -49,7 +49,7 @@ export const bindStore = (jsonStorage: JsonStore) => {
 export const useStore = (): Partial<StoreData> | undefined => store.use()
 
 // the storage file is read in the background, anything written before that would replace it with defaults
-export async function whenLoaded() {
+async function whenLoaded() {
 	for (let waited = 0; store.loaded === false && waited < 5000; waited += 25) await sleep(25)
 	if (store.loaded === false) await store.get?.()
 }
@@ -122,7 +122,6 @@ function kindOfId(repo: Repo, id: string): PluginKind {
 	return plugin ? kindOf(plugin, repo.kinds) : 'plugins'
 }
 
-// new plugins and recent updates nobody has opened yet, per kind, following each repository's notification settings
 export function pendingByKind(data: Partial<StoreData> | undefined, catalog: Repo[]) {
 	const seen = asObject(data?.seen)
 	const alerts = asObject(data?.alerts)
@@ -439,7 +438,7 @@ export function load(url: string) {
 	return job
 }
 
-export function parseRepoList(json: any): Repo[] | null {
+function parseRepoList(json: any): Repo[] | null {
 	const items = Array.isArray(json) ? json : json?.repos
 	if (!Array.isArray(items)) return null
 
@@ -469,7 +468,6 @@ export function parseRepoList(json: any): Repo[] | null {
 	return repos.length ? repos : null
 }
 
-// a note from the repository list shows on the main page, so it can be set or removed without a plugin update
 function parseNote(value: unknown): Note | null {
 	const raw = typeof value === 'string' ? { text: value } : asObject(value)
 	const text = typeof raw.text === 'string' ? raw.text.trim().slice(0, 600) : ''
@@ -629,7 +627,6 @@ export function restore() {
 	})
 }
 
-// a plugin that needs a Revenge Next API was never built for Valenced
 export const isLegacy = (plugin: ListedPlugin) => (plugin.requires ?? []).some(entry => !entry.endsWith('(optional)') && entry.startsWith('revenge.'))
 
 // requirements are listed as "id 1.2.0" or "id 1.2.0 (optional)"

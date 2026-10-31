@@ -68,8 +68,8 @@ export const RECHECK_AFTER_FOCUS = 5 * 60 * 1000
 export const MAX_REQUESTS = 4
 export const PAGE_SIZE = 30
 
-export const ICON_SLOT = 28
-export const ICON_GAP = 8
+const ICON_SLOT = 28
+const ICON_GAP = 8
 export const ICON_INDENT = ICON_SLOT + ICON_GAP
 
 export const SORTS = {
@@ -98,6 +98,8 @@ export const COMMUNITY_REPO = 'https://community.valenced.app/'
 // comes with Valenced itself and can't be removed, so it is always listed, and always last
 export const BUILT_IN_REPO: Repo = { url: slash(COMMUNITY_REPO), source: 'https://github.com/Valenced/valenced-community-plugins', badges: ['Built in Repo'], builtIn: true }
 export const SELF_ID = 'k1ngop.repository-browser'
+export const OWNER_ID = '641266820187160576'
+export const SOURCE_URL = 'https://github.com/k1ng0p/Valenced-Plugins-by-k1ng0p/tree/main/plugins/repository-browser'
 
 export type Note = { title?: string; text: string; level: 'info' | 'warning' | 'critical' }
 
@@ -119,7 +121,6 @@ export const isRemote = (value?: string): value is string => !!value && /^https:
 export const errorMessage = (e: unknown): string => (e as { message?: string } | null)?.message ?? String(e)
 export const hostOf = (url: string) => url.match(/^https:\/\/([^/]+)/)?.[1] ?? url
 export const asObject = (value: any): Record<string, any> => (value && typeof value === 'object' && !Array.isArray(value) ? value : {})
-// plain wording and a next step for what a repository or the network can answer with
 export function friendlyError(err: string) {
 	if (/network request failed|failed to fetch/i.test(err)) return "Can't reach this repository. Check your connection and the address"
 	if (/timed out/i.test(err)) return 'The repository took too long to answer. Try again later'
@@ -139,8 +140,7 @@ export function friendlyError(err: string) {
 	return err
 }
 
-// what went wrong with an install or an enable, in words a person can act on
-export function explainError(e: unknown) {
+function explainError(e: unknown) {
 	const problems = (e as { details?: { problems?: { id: string; required?: string; installed?: boolean; enabled?: boolean }[] } } | null)?.details?.problems
 	const lines = (problems ?? []).map(problem => {
 		const range = problem.required ? ` ${problem.required}` : ''
@@ -150,8 +150,7 @@ export function explainError(e: unknown) {
 	})
 	return lines.length ? `Needs ${lines.join('; ')}.` : friendlyError(errorMessage(e).split('\n')[0])
 }
-// what failed, where, and the error as Valenced reported it, with a likely cause when one is known
-export function describeError(e: unknown, info: string[] = []) {
+function describeError(e: unknown, info: string[] = []) {
 	const raw = errorMessage(e).split('\n')[0]
 	const explained = explainError(e)
 	const dependencyProblems = !!(e as { details?: { problems?: unknown[] } } | null)?.details?.problems?.length
@@ -179,7 +178,7 @@ export const bindReporter = (report: (error: unknown) => void) => {
 	reporter = report
 }
 
-export type Problem = { at: number; context: string; message: string; count: number }
+type Problem = { at: number; context: string; message: string; count: number }
 
 const MAX_PROBLEMS = 20
 const problems: Problem[] = []
@@ -203,7 +202,6 @@ function record(context: string, error: unknown) {
 // failures that are expected now and then (offline, timeouts) are kept for diagnostics only
 export const logProblem = (context: string, error: unknown) => void record(context, error)
 
-// a problem that has gone away shouldn't keep showing up in diagnostics
 export function clearProblems(context: string) {
 	for (let index = problems.length - 1; index >= 0; index--) if (problems[index].context === context) problems.splice(index, 1)
 }
@@ -211,7 +209,7 @@ export function clearProblems(context: string) {
 // the install or enable was refused by Valenced itself (bad artifact, missing dependency), nothing is broken in this plugin
 const fromHost = (error: unknown) => !!(error as { host?: boolean } | null)?.host
 
-export const WATERMARK = "Logged by k1ng_op's Repository Browser"
+const WATERMARK = "Logged by k1ng_op's Repository Browser"
 
 // logs get copied around, this says which tool wrote them
 export function watermark(error: unknown, context = '') {
@@ -334,7 +332,7 @@ function compareVersions(a: number[], b: number[]) {
 }
 
 // ranges this doesn't understand count as satisfied, so a warning only shows when it is certain
-export function satisfiesRange(version: string, range: string) {
+function satisfiesRange(version: string, range: string) {
 	const current = parseVersion(version)
 	return range.split('||').some(set =>
 		set

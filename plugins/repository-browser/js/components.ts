@@ -1,5 +1,4 @@
 import { Checkbox } from '@valenced/components'
-import { Tokens } from '@valenced/discord/common/tokens'
 import { Design } from '@valenced/discord/design'
 import { React, ReactNative } from '@valenced/react'
 import { cachedAvatar, catalog, discordUser, githubAvatar, newRepoCount, unreadCount, useStore } from './data'
@@ -187,23 +186,6 @@ export function Notice() {
 				}),
 			),
 		),
-	)
-}
-
-export function FeedSection(props: { title: string; action?: string; variant?: string; loading?: boolean; onAction: () => void; children: any }) {
-	const { title, action = 'Clear', variant = 'tertiary', loading, onAction, children } = props
-	const { View } = ReactNative
-	const { Button, Text } = Design
-	return h(
-		View,
-		null,
-		h(
-			View,
-			{ style: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 } },
-			h(Text, { variant: 'text-md/medium', color: 'text-muted' }, title),
-			h(Button, { text: action, size: 'sm', variant, loading, onPress: onAction }),
-		),
-		children,
 	)
 }
 

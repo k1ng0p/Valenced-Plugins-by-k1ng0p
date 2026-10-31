@@ -90,6 +90,7 @@
       "discord": "1203667124724170752",
       "badges": ["Utility"]
     },
+
     {
       "url": "https://lisaexists.github.io/valenced-plugins/",
       "source": "https://github.com/LisaExists/valenced-plugins",
@@ -107,12 +108,6 @@
       "source": "https://github.com/MarkLong0467/EskimoPlugins",
       "discord": "1096566768421580912",
       "badges": ["Utility"]
-    },
-    {
-      "url": "https://alpine-vortex.github.io/valenced-rain/index.json",
-      "source": "https://github.com/alpine-vortex/valenced-rain",
-      "discord": "",
-      "badges": ["Themes"]
     },
     {
       "url": "https://val.is-your.app/",

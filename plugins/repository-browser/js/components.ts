@@ -251,16 +251,16 @@ const MAX_BADGES = 6
 
 function BadgeShapeIcon({ shape, color }: { shape: BadgeShape; color: string }) {
 	const { Image, View } = ReactNative
-	const gap = { marginRight: 5 }
-	if (shape === 'circle') return h(View, { style: { ...gap, width: 9, height: 9, borderRadius: 5, backgroundColor: color } })
+	const gap = { marginRight: 4 }
+	if (shape === 'circle') return h(View, { style: { ...gap, width: 7, height: 7, borderRadius: 4, backgroundColor: color } })
 	if (shape === 'triangle') {
 		return h(View, {
-			style: { ...gap, width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: color },
+			style: { ...gap, width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderBottomWidth: 7, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: color },
 		})
 	}
-	if (shape === 'diamond') return h(View, { style: { ...gap, width: 8, height: 8, backgroundColor: color, transform: [{ rotate: '45deg' }] } })
+	if (shape === 'diamond') return h(View, { style: { ...gap, width: 6, height: 6, backgroundColor: color, transform: [{ rotate: '45deg' }] } })
 	const star = asset('StarIcon')
-	return star ? h(Image, { source: star, style: { ...gap, width: 11, height: 11, tintColor: color } }) : null
+	return star ? h(Image, { source: star, style: { ...gap, width: 9, height: 9, tintColor: color } }) : null
 }
 
 function Badge({ label }: { label: string }) {
@@ -273,18 +273,18 @@ function Badge({ label }: { label: string }) {
 			style: {
 				flexDirection: 'row',
 				alignItems: 'center',
-				paddingHorizontal: 9,
-				paddingVertical: 2,
+				paddingHorizontal: 6,
+				paddingVertical: 1,
 				borderRadius: 999,
 				borderWidth: 1,
 				borderColor: tone.border,
 				backgroundColor: tone.fill,
-				marginRight: 6,
-				marginBottom: 4,
+				marginRight: 4,
+				marginBottom: 3,
 			},
 		},
 		tone.shape ? h(BadgeShapeIcon, { shape: tone.shape, color: tone.shapeColor ?? tone.text }) : null,
-		h(Text, { variant: 'text-xs/bold', numberOfLines: 1, style: { color: tone.text } }, label.toUpperCase()),
+		h(Text, { variant: 'text-xs/bold', numberOfLines: 1, style: { color: tone.text, fontSize: 10, lineHeight: 13 } }, label.toUpperCase()),
 	)
 }
 

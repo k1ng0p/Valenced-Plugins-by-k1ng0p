@@ -66,6 +66,22 @@ export default function SettingsComponent({
 							onValueChange={messageContent => storage.set({ messageContent })}
 						/>
 					</TableRowGroup>
+					<TableRowGroup title="Tracking">
+						<TableSwitchRow
+							label="Servers"
+							icon={<TableRowAssetIcon name="ServerIcon" />}
+							subLabel="Typing, messages and voice in servers"
+							value={settings.servers}
+							onValueChange={servers => storage.set({ servers })}
+						/>
+						<TableSwitchRow
+							label="DMs"
+							icon={<TableRowAssetIcon name="ChatIcon" />}
+							subLabel="Typing, messages and voice in DMs and group DMs"
+							value={settings.dms}
+							onValueChange={dms => storage.set({ dms })}
+						/>
+					</TableRowGroup>
 					<TableRowGroup title="Notify me about">
 						{Toggles.map(({ key, label, icon }) => (
 							<TableSwitchRow

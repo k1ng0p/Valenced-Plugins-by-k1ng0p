@@ -11,6 +11,10 @@ export interface Settings {
 	users: string[]
 	/** Also track everyone on the friends list. */
 	friends: boolean
+	/** Typing, messages and voice in servers. */
+	servers: boolean
+	/** Typing, messages and voice in DMs and group DMs. */
+	dms: boolean
 	status: boolean
 	/** Playing, listening, watching and competing activities. */
 	activity: boolean
@@ -25,6 +29,8 @@ export interface Settings {
 export const DefaultSettings: Settings = {
 	users: [],
 	friends: true,
+	servers: true,
+	dms: true,
 	status: true,
 	activity: false,
 	typing: true,
@@ -264,6 +270,12 @@ function describeChannel(channelId: string, fallbackGuildId?: string | null) {
 	return guild ? `${guild.name} › ${name}` : name
 }
 
+function isChannelEnabled(channelId: string) {
+	const { servers, dms } = getSettings()
+	const type = getChannelStore().getChannel(channelId)?.type
+	return type === ChannelType.DM || type === ChannelType.GroupDM ? dms : servers
+}
+
 /** Anything happening in the chat that is already open is visible without a toast. */
 const isViewing = (channelId: string) =>
 	getSelectedChannelStore().getChannelId() === channelId
@@ -337,7 +349,12 @@ function onPresence({ updates }: PresenceUpdates) {
 }
 
 function onTyping({ channelId, userId }: TypingStart) {
-	if (!getSettings().typing || !isTracked(userId) || isViewing(channelId))
+	if (
+		!getSettings().typing ||
+		!isTracked(userId) ||
+		!isChannelEnabled(channelId) ||
+		isViewing(channelId)
+	)
 		return
 
 	if (DEBUG) logger.log('typing', Date.now(), userId, channelId)
@@ -359,7 +376,8 @@ function onVoice({ voiceStates }: VoiceStateUpdates) {
 		// The store still holds the state from before this update
 		const previous = getVoiceStateStore().getVoiceStateForUser(userId)
 		const inChannel = channelId ?? previous?.channelId
-		if (!inChannel || isViewing(inChannel)) continue
+		if (!inChannel || !isChannelEnabled(inChannel) || isViewing(inChannel))
+			continue
 
 		const name = getUserName(userId)
 		const where = describeChannel(inChannel, state.guildId)
@@ -419,6 +437,7 @@ function onMessage({ channelId, guildId, optimistic, message }: MessageCreate) {
 		optimistic ||
 		!author ||
 		!isTracked(author.id) ||
+		!isChannelEnabled(channelId) ||
 		isViewing(channelId)
 	)
 		return

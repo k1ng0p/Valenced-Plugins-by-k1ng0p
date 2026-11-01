@@ -96,7 +96,12 @@
       "discord": "1203667124724170752",
       "badges": ["Utility"]
     },
-
+    {
+      "url": "https://plugins.val.kmmiio99o.dev/index.json",
+      "source": "https://github.com/kmmiio99o/valenced-plugins",
+      "discord": "879393496627306587",
+      "badges": ["Trusted", "Developer", "Popular"]
+    },
     {
       "url": "https://lisaexists.github.io/valenced-plugins/",
       "source": "https://github.com/LisaExists/valenced-plugins",

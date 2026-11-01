@@ -359,12 +359,12 @@ function cleanListing(raw: any, url: string): Listing {
 			id,
 			name: text(item.name, 80) || id,
 			description: text(item.description, 400),
-			author: text(item.author, 200),
+			author: text(item.author, 600),
 			icon: safeIcon(item.icon, url),
 			version: text(item.version, 40),
 			size: typeof item.size === 'number' && Number.isFinite(item.size) ? item.size : undefined,
 			discord: (Array.isArray(item.discord) ? item.discord : []).map((entry: any) => text(entry, 40)).filter(Boolean).slice(0, 20) as string[],
-			contributors: (Array.isArray(item.contributors) ? item.contributors : []).map((entry: any) => text(entry, 120)).filter(Boolean).slice(0, 10) as string[],
+			contributors: (Array.isArray(item.contributors) ? item.contributors : []).map((entry: any) => text(entry, 300)).filter(Boolean).slice(0, 10) as string[],
 			requires: (Array.isArray(item.requires) ? item.requires : [])
 				.map((entry: any) => text(entry, 100))
 				.filter(Boolean)

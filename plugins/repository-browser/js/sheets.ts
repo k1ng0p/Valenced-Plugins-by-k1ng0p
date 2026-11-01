@@ -7,7 +7,7 @@ import { ReactNativeSafeAreaContext } from '@valenced/externals/react-native-saf
 import { parsePluginContributor } from '@valenced/plugins/utils'
 import { React, ReactNative } from '@valenced/react'
 import { lookupGeneratedIconComponent } from '@valenced/utils/discord'
-import { catalog, dependentsOf, dismiss, dismissAll, isLegacy, listings, missingDependencies, openUserProfile, setAlertMode, setKindMuted, useStore } from './data'
+import { catalog, dependentsOf, dismiss, dismissAll, isLegacy, listings, missingDependencies, openUserProfile, parseAuthor, setAlertMode, setKindMuted, useStore } from './data'
 import { available, blocked, checkInstall, install, openPluginSettings, pendingReload, putRepos, readState, setHeld, toggle, uninstall, updatePlugins } from './valenced'
 import type { BulkItem } from './valenced'
 import type { ValencedState } from './valenced'
@@ -101,7 +101,7 @@ function ContactsSheet({ title, people }: { title: string; people: string[] }) {
 	const items = React.useMemo(
 		() =>
 			people.map((raw, index) => {
-				const contributor = parsePluginContributor(raw) ?? { name: raw, ids: [], links: [] }
+				const contributor = parsePluginContributor(raw) ?? { name: parseAuthor(raw).name, ids: [], links: [] }
 				return { id: String(index), label: contributor.name, page: h(ContributorEntries, { contributor }) }
 			}),
 		[people],
@@ -138,7 +138,7 @@ function PluginAuthor({ pluginName, author }: { pluginName: string; author: stri
 	const parsed = parsePluginContributor(author)
 
 	if (!parsed || !(parsed.ids.length || parsed.links.length)) {
-		return h(Text, { color: 'text-subtle', style: { flexShrink: 1 }, variant: 'heading-md/medium' }, parsed?.name ?? author)
+		return h(Text, { color: 'text-subtle', style: { flexShrink: 1 }, variant: 'heading-md/medium' }, parsed?.name ?? parseAuthor(author).name)
 	}
 
 	return h(
@@ -159,7 +159,7 @@ function PluginContributors({ pluginName, contributors }: { pluginName: string; 
 	const { Pressable } = ReactNative
 	const { Text } = Design
 
-	const people = contributors.map(raw => parsePluginContributor(raw)?.name ?? raw)
+	const people = contributors.map(raw => parsePluginContributor(raw)?.name ?? parseAuthor(raw).name)
 	let names = ''
 	let shown = 0
 	while (shown < people.length) {

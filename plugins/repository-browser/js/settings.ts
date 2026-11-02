@@ -27,10 +27,10 @@ import {
 } from './data'
 import type { SeenEntry } from './data'
 import type { FeedItem, UpdateItem } from './sheets'
-import { THEMES_SETTINGS, THEME_SUPPORT, available, blocked, checkInstall, install, installMany, openPluginSettings, pendingReload, putRepos, readState, toggle, toggleMany, uninstall, uninstallMany, updatePlugins } from './valenced'
+import { THEMES_SETTINGS, THEME_SUPPORT, available, blocked, checkInstall, install, installMany, openPluginSettings, pendingReload, reloadNames, putRepos, readState, toggle, toggleMany, uninstall, uninstallMany, updatePlugins } from './valenced'
 import type { BulkItem } from './valenced'
 import type { ValencedState } from './valenced'
-import { BUILT_IN_NOTE, OWNER_ID, SELF_ID, SOURCE_URL, confirm, setHaptics, tap, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
+import { BUILT_IN_NOTE, OWNER_ID, native, SELF_ID, SOURCE_URL, confirm, setHaptics, tap, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
 import type { AlertMode, AvailableUpdate, ListedPlugin, PluginKind, Repo, SortKey } from './shared'
 
 type Hit = { repo: Repo; plugin: ListedPlugin }
@@ -366,7 +366,7 @@ function useBrowser() {
 
 		if (installed) {
 			const on = isEnabled(plugin.id)
-			const settingsReady = on && !toggled.has(plugin.id) && !state.enabled[plugin.id]?.pendingReload
+			const applyReady = on && !toggled.has(plugin.id)
 			return [
 				h(IconButton, {
 					key: 'remove',
@@ -376,12 +376,12 @@ function useBrowser() {
 					onPress: () => removePlugin(plugin),
 				}),
 				installed.settings &&
-					h(IconButton, { key: 'settings', size: 'sm', variant: 'secondary', icon: asset('SettingsIcon'), disabled: !settingsReady, onPress: () => openPluginSettings(plugin.id) }),
-				kindOf(plugin, repo.kinds) !== 'plugins' && h(Button, { key: 'apply', text: 'Apply', size: 'sm', variant: 'primary', disabled: !settingsReady, onPress: () => applyPack(plugin) }),
+					h(IconButton, { key: 'settings', size: 'sm', variant: 'secondary', icon: asset('SettingsIcon'), onPress: () => openPluginSettings(plugin.id, plugin.name) }),
+				kindOf(plugin, repo.kinds) !== 'plugins' && h(Button, { key: 'apply', text: 'Apply', size: 'sm', variant: 'primary', disabled: !applyReady, onPress: () => applyPack(plugin) }),
 				h(FormSwitch, {
 					key: 'enabled',
 					value: on,
-					onValueChange: (value: boolean) => toggle(plugin.id, value).then(done => done && afterToggle(plugin.id, value)),
+					onValueChange: (value: boolean) => toggle(plugin.id, value, plugin.name).then(done => done && afterToggle(plugin.id, value)),
 				}),
 			]
 		}
@@ -459,7 +459,7 @@ function useBrowser() {
 		}
 
 		await withBusy(async () => {
-			if ((await toggleMany(ids, on)).length) setSelection({})
+			if ((await toggleMany(ids, on, listedName)).length) setSelection({})
 		})
 	}
 
@@ -473,11 +473,11 @@ function useBrowser() {
 					return
 				}
 				if (!(await confirm('Disable all plugins?', `${ids.length} downloaded plugin${ids.length === 1 ? '' : 's'} will be turned off until you switch this off again. Plugin Browser and Valenced's own plugins stay on.`, 'Disable all', 'destructive'))) return
-				const done = await toggleMany(ids, false)
+				const done = await toggleMany(ids, false, listedName)
 				if (done.length) save({ disabledAll: done })
 			} else {
 				const ids = (data?.disabledAll ?? []).filter(id => state.installed.has(id))
-				const done = ids.length ? await toggleMany(ids, true) : []
+				const done = ids.length ? await toggleMany(ids, true, listedName) : []
 				const rest = ids.filter(id => !done.includes(id))
 				save({ disabledAll: rest.length ? rest : undefined })
 			}
@@ -830,6 +830,31 @@ function emptyList(b: Ctx) {
 	)
 }
 
+const listedName = (id: string) =>
+	catalog
+		.flatMap(repo => listings.get(repo.url)?.plugins ?? [])
+		.find(plugin => plugin.id === id)?.name ?? id
+
+// shown for as long as a plugin only takes effect after a reload, tapping it reloads Valenced
+function reloadRow(b: Ctx) {
+	const { TableRow, TableRowGroup } = Design
+	const flagged = Object.entries(b.state?.enabled ?? {}).filter(([id, entry]) => entry?.pendingReload && b.state?.installed.has(id)).map(([id]) => id)
+	const names = [...new Set([...reloadNames.keys(), ...flagged])].map(id => reloadNames.get(id) ?? listedName(id))
+	if (!names.length) return null
+
+	return h(
+		TableRowGroup,
+		{ key: 'reload' },
+		h(TableRow, {
+			label: 'Reload required',
+			subLabel: names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', '),
+			icon: icon('RetryIcon'),
+			arrow: true,
+			onPress: () => native('valenced.app.reload'),
+		}),
+	)
+}
+
 function MainPage(b: Ctx, tab: PluginKind) {
 	const { TableRow, TableRowGroup, Text } = Design
 	const { sort } = b
@@ -846,6 +871,7 @@ function MainPage(b: Ctx, tab: PluginKind) {
 	const repos = [...sorted.filter(repo => !repo.builtIn), ...sorted.filter(repo => repo.builtIn)]
 
 	return [
+		reloadRow(b),
 		h(Notice, { key: 'notice' }),
 		catalog.length
 			? h(CountsCard, {

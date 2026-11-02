@@ -753,7 +753,7 @@ function PluginSheet({ repo: initialRepo, plugin, onChange }: SheetProps) {
 	const warning = [compatibilityWarning(plugin, state?.discord, blocked.get(id)?.text), ...missingDependencies(plugin, state?.installed), blockReason && `Can't be installed: ${blockReason}`].filter(Boolean).join('\n') || undefined
 
 	const switchOrInstall = installed
-		? h(FormSwitch, { value: enabled, disabled: reloadPending, onValueChange: (value: boolean) => toggle(id, value).then(done => done && (setEnabledNow(value), changed())) })
+		? h(FormSwitch, { value: enabled, disabled: reloadPending, onValueChange: (value: boolean) => toggle(id, value, name).then(done => done && (setEnabledNow(value), changed())) })
 		: h(Button, {
 				size: 'sm',
 				text: entry?.enabled ? 'Install' : entry ? 'Enable repo' : 'Add repo',
@@ -801,9 +801,8 @@ function PluginSheet({ repo: initialRepo, plugin, onChange }: SheetProps) {
 							size: 'lg',
 							icon: asset('SettingsIcon'),
 							label: 'Settings',
-							disabled: !enabled || reloadPending,
 							onPress: () => {
-								openPluginSettings(id)
+								openPluginSettings(id, name)
 								close()
 							},
 						})

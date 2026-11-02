@@ -1,6 +1,6 @@
 import { RootNavigationRef } from '@valenced/discord/modules/main_tabs_v2'
 import { formatVersion } from '@valenced/plugins/utils'
-import { BUILT_IN_REPO, askReload, asObject, clearProblems, confirm, errorMessage, fail, logProblem, native, reportError, showError, slash, tap, usesEnvelope } from './shared'
+import { BUILT_IN_REPO, askReload, asObject, clearProblems, confirm, errorMessage, fail, inform, logProblem, native, reportError, showError, slash, tap, usesEnvelope } from './shared'
 import type { AvailableUpdate, ListedPlugin, PluginRef, Repo, ValencedRepo } from './shared'
 type PendingUpdate = { id: string; name: string; installed: string; available: string; channel: string }
 export type ValencedState = Awaited<ReturnType<typeof readState>>
@@ -8,6 +8,8 @@ export type ValencedState = Awaited<ReturnType<typeof readState>>
 export const available = new Map<string, AvailableUpdate>()
 export const blocked = new Map<string, { repo: string; text: string }>()
 export const pendingReload = new Set<string>()
+// plugins that only take effect after a reload, kept until the app restarts
+export const reloadNames = new Map<string, string>()
 // ids offered by the repositories added to Valenced, a dependency from any of them can be installed
 export const providedIds = new Set<string>()
 
@@ -201,9 +203,26 @@ export async function checkInstall(repoUrl: string, plugin: ListedPlugin, ref?: 
 	}
 }
 
-export function openPluginSettings(id: string) {
+async function trackReload(items: { id: string; name: string }[]) {
+	const state = await readState().catch(() => null)
+	const flagged = items.filter(item => state?.enabled[item.id]?.pendingReload)
+	for (const item of flagged) reloadNames.set(item.id, item.name)
+	return flagged
+}
+
+// only the plugins that need it are named
+const askReloadFor = (flagged: { name: string }[]) => flagged.length && askReload(`${flagged.map(item => item.name).join(', ')} ${flagged.length === 1 ? 'needs' : 'need'} a reload to apply.`)
+
+export function openPluginSettings(id: string, name?: string) {
 	const nav = RootNavigationRef.getRootNavigationRef()
-	if (nav.isReady()) (nav as any).navigate(id)
+	if (!nav.isReady()) return
+	;(nav as any).navigate(id)
+	// a plugin that hasn't started yet has no settings screen to open
+	if (!name) return
+	setTimeout(() => {
+		const route = (nav as any).getCurrentRoute?.()
+		if (route && route.name !== id) askReload(`${name}'s settings open once it is running, a reload starts it.`)
+	}, 400)
 }
 
 export async function uninstall(plugin: ListedPlugin, dependents: string[] = []) {
@@ -211,13 +230,25 @@ export async function uninstall(plugin: ListedPlugin, dependents: string[] = [])
 	if (!(await confirm('Uninstall plugin?', `${plugin.name} and all of its data will be removed. This cannot be undone.${warning}`, 'Uninstall', 'destructive'))) return false
 	try {
 		await native('valenced.plugins.setEnabled', [plugin.id, false, false]).catch(() => {})
+		await trackReload([{ id: plugin.id, name: plugin.name }])
 		await native('valenced.plugins.uninstall', [plugin.id])
 		tap()
-		askReload('Uninstalled. Reload to apply it.')
 		return true
 	} catch (e) {
 		fail(e, `uninstall ${plugin.name}`, [`${plugin.name} (${plugin.id})`])
 		return false
+	}
+}
+
+// installing only puts the files in place, so what was picked is turned on afterwards, which starts it
+async function enableInstalled(items: { id: string; name: string }[]) {
+	const state = await readState().catch(() => null)
+	for (const item of items.filter(item => !state?.enabled[item.id]?.enabled)) {
+		try {
+			await setEnabled(item.id, true)
+		} catch (e) {
+			fail(e, `enable ${item.name}`)
+		}
 	}
 }
 
@@ -246,9 +277,10 @@ export async function install(repoUrl: string, plugin: ListedPlugin, ref?: Plugi
 		if (ref?.type === 'version') lines.push('Updates will be paused to stay on this version. Pick a channel or turn on Allow updates to receive updates again.')
 		if (!(await confirm('Install plugin?', lines.join('\n\n')))) return false
 
-		const result = await native('valenced.plugins.install', [plan])
+		await native('valenced.plugins.install', [plan])
+		await enableInstalled([{ id: plugin.id, name: plugin.name }])
 		tap()
-		if (result?.pending?.length) askReload('Installed. Reload to apply it.')
+		askReloadFor(await trackReload(plan.actions.map((action: any) => ({ id: action.id, name: action.id === plugin.id ? plugin.name : action.id }))))
 		return true
 	} catch (e) {
 		fail(e, `install ${plugin.name}`, [`${plugin.name} (${plugin.id}${plugin.version ? `@${plugin.version}` : ''})`, `Repository: ${repoUrl}`])
@@ -271,17 +303,23 @@ export async function updatePlugins(updates: PendingUpdate[]) {
 		const title = updates.length === 1 ? 'Update plugin?' : `Update ${updates.length} plugins?`
 		if (!(await confirm(title, lines.join('\n'), 'Update'))) return false
 
+		const before = await readState().catch(() => null)
 		for (const [index, plan] of plans.entries()) {
 			await native('valenced.plugins.install', [plan])
 			pendingReload.add(updates[index].id)
 			done.push(updates[index])
 		}
 		tap()
-		askReload('Updated. Reload to apply it.')
+		// a plugin that was running keeps its old code until the reload
+		const flagged = await trackReload(done)
+		const running = done.filter(item => before?.enabled[item.id]?.enabled && !flagged.some(other => other.id === item.id))
+		for (const item of running) reloadNames.set(item.id, item.name)
+		askReloadFor([...flagged, ...running])
 		return true
 	} catch (e) {
 		reportError(e, 'update plugins')
-		if (done.length) askReload(`Updated ${done.length} of ${updates.length}. ${errorMessage(e)}\nReload to apply the ones that worked.`)
+		await trackReload(done)
+		if (done.length) inform(`Updated ${done.length} of ${updates.length}`, errorMessage(e).split('\n')[0])
 		else showError(e)
 		return false
 	}
@@ -307,7 +345,7 @@ async function setEnabled(id: string, on: boolean) {
 }
 
 // plugins that depend on each other can refuse to go first, so what failed is tried again once the rest is done
-export async function toggleMany(ids: string[], on: boolean) {
+export async function toggleMany(ids: string[], on: boolean, nameOf: (id: string) => string = id => id) {
 	const word = on ? 'enable' : 'disable'
 	const done: string[] = []
 	let waiting = ids
@@ -331,20 +369,22 @@ export async function toggleMany(ids: string[], on: boolean) {
 	if (lastError && failed.length) reportError(lastError, `${word} plugins`)
 	if (done.length) {
 		tap()
-		// Valenced shows its own reload dialog for plugins it flags as needing one, so ours would be a second popup
-		const hostPrompts = !on && (await readState().then(state => done.some(id => state.enabled[id]?.pendingReload)).catch(() => false))
-		if (!hostPrompts) askReload(`${on ? 'Enabled' : 'Disabled'} ${done.length} plugin${done.length === 1 ? '' : 's'}${failed.length ? `, ${failed.length} could not be changed` : ''}. Reload to apply it.`)
+		// Valenced asks for the reload itself when plugins are turned off
+		const flagged = await trackReload(done.map(id => ({ id, name: nameOf(id) })))
+		if (on) askReloadFor(flagged)
+		if (failed.length) inform('Some plugins could not be changed', `${done.length} of ${ids.length} changed. ${errorMessage(lastError).split('\n')[0]}`)
 	} else if (lastError) {
 		showError(lastError)
 	}
 	return done
 }
 
-export async function toggle(id: string, on: boolean) {
+export async function toggle(id: string, on: boolean, name = id) {
 	try {
 		await setEnabled(id, on)
 		tap()
-		askReload(`${on ? 'Enabled' : 'Disabled'}. Reload to apply it.`)
+		const flagged = await trackReload([{ id, name }])
+		if (on) askReloadFor(flagged)
 		return true
 	} catch (e) {
 		fail(e, `${on ? 'enable' : 'disable'} ${id}`)
@@ -355,20 +395,19 @@ export async function toggle(id: string, on: boolean) {
 export type BulkItem = { id: string; name: string; repo: string; repoName: string; version?: string; size?: number; description?: string; icon?: string }
 
 export async function uninstallMany(items: { id: string; name: string }[]) {
-	const plural = items.length === 1 ? '' : 's'
 	const done: string[] = []
 	try {
 		for (const item of items) {
 			await native('valenced.plugins.setEnabled', [item.id, false, false]).catch(() => {})
+			await trackReload([item])
 			await native('valenced.plugins.uninstall', [item.id])
 			done.push(item.id)
 		}
 		tap()
-		askReload(`Uninstalled ${done.length} plugin${plural}. Reload to apply it.`)
 		return true
 	} catch (e) {
 		reportError(e, 'uninstall plugins')
-		if (done.length) askReload(`Uninstalled ${done.length} of ${items.length}. ${errorMessage(e).split('\n')[0]}\nReload to apply the ones that worked.`)
+		if (done.length) inform(`Uninstalled ${done.length} of ${items.length}`, errorMessage(e).split('\n')[0])
 		else showError(e)
 		return false
 	}
@@ -416,12 +455,16 @@ export async function installMany(items: BulkItem[]) {
 			}
 			done.push(planned[index].id)
 		}
+		await enableInstalled(done.map(id => ({ id, name: items.find(item => item.id === id)?.name ?? id })))
 		tap()
-		askReload(`Installed ${done.length} plugin${done.length === 1 ? '' : 's'}. Reload to apply it.`)
+		askReloadFor(await trackReload([...handled].map(id => ({ id, name: items.find(item => item.id === id)?.name ?? id }))))
 		return true
 	} catch (e) {
 		reportError(e, 'install plugins')
-		if (done.length) askReload(`Installed ${done.length} of ${items.length}. ${errorMessage(e).split('\n')[0]}\nReload to apply the ones that worked.`)
+		const finished = done.map(id => ({ id, name: items.find(item => item.id === id)?.name ?? id }))
+		await enableInstalled(finished)
+		await trackReload(finished)
+		if (done.length) inform(`Installed ${done.length} of ${items.length}`, errorMessage(e).split('\n')[0])
 		else showError(e)
 		return false
 	}

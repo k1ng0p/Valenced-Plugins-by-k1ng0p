@@ -53,6 +53,7 @@ interface PresenceUpdate {
 
 const MaxTracked = 500
 const PersistDelay = 1500
+const DayMs = 24 * 60 * 60 * 1000
 
 const lastSeen = new Map<string, number>()
 /** Users seen online since start, so their next offline update is a real transition. */
@@ -103,12 +104,35 @@ function formatRelative(timestamp: number) {
 	})
 }
 
+/** The clock time, plus the day once it's no longer today. */
+function formatExact(timestamp: number) {
+	const date = new Date(timestamp)
+	const time = date.toLocaleTimeString([], {
+		hour: 'numeric',
+		minute: '2-digit',
+	})
+
+	const daysAgo = Math.round(
+		(new Date().setHours(0, 0, 0, 0) -
+			new Date(timestamp).setHours(0, 0, 0, 0)) /
+			DayMs,
+	)
+	if (daysAgo <= 0) return time
+	if (daysAgo === 1) return `${time} Yesterday`
+	if (daysAgo < 7)
+		return `${time} ${date.toLocaleDateString([], { weekday: 'long' })}`
+
+	return `${time} ${date.toLocaleDateString([], {
+		month: 'short',
+		day: 'numeric',
+		year:
+			date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
+	})}`
+}
+
 function formatTime(timestamp: number) {
 	return getSettings().timeFormat === 'exact'
-		? new Date(timestamp).toLocaleTimeString([], {
-				hour: 'numeric',
-				minute: '2-digit',
-			})
+		? formatExact(timestamp)
 		: formatRelative(timestamp)
 }
 

@@ -123,13 +123,26 @@
       "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
       "icon": "HourglassIcon",
       "channels": {
-        "latest": "1.0.0"
+        "latest": "1.1.0"
       },
       "versions": {
         "1.0.0": {
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.last-online-tracker@1.0.0.zip",
           "sha256": "b026aad7da9a8b884c0f128ae30474730f45c2fb2e618b20a84b5b5d6d11a6a8",
           "size": 3437,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.1.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.last-online-tracker@1.1.0.zip",
+          "sha256": "18c2668fbcd644876318db7daa9439b4f5cc9dd65e6ae23cdec115bb3d5bfdc9",
+          "size": 3541,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"

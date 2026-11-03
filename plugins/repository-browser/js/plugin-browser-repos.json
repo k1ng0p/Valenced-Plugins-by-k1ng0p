@@ -31,6 +31,12 @@
       "badges": ["Trusted", "Developer"]
     },
     {
+      "url": "https://67.mlem.my/index.json",
+      "source": "https://github.com/mlemception/mlem-plugins",
+      "discord": "1274359272318304277",
+      "badges": ["Utility"]
+    },
+    {
       "url": "https://plugins.benjiisworld.com/",
       "source": "https://github.com/Accentaro/Valenced-Plugins",
       "discord": "463702169443368970",

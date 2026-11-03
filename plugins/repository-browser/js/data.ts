@@ -4,7 +4,7 @@ import { Stores, withStoreName } from '@valenced/discord/flux'
 import { filters, lookupModule } from '@valenced/modules/finders'
 import { ReactNative } from '@valenced/react'
 import { available, providedIds, refreshAvailable } from './valenced'
-import { AVATAR_TTL, BUILT_IN_REPO, DAY, KINDS, MAX_REQUESTS, RECHECK_AFTER_FOCUS, REMOTE_LIST, asObject, errorMessage, hostOf, isRemote, kindOf, clearProblems, logProblem, reportError, setHaptics, slash, sleep } from './shared'
+import { AVATAR_TTL, BUILT_IN_REPO, DAY, KINDS, MAX_REQUESTS, RECHECK_AFTER_FOCUS, REMOTE_LIST, asObject, errorMessage, hostOf, indexUrl, isRemote, kindOf, clearProblems, logProblem, reportError, setHaptics, slash, sleep } from './shared'
 import type { AlertMode, ListedPlugin, Listing, Note, PluginKind, Repo } from './shared'
 
 export type SeenEntry = {
@@ -307,7 +307,7 @@ async function fetchIndex(url: string, attempt: number, timeout: number) {
 	try {
 		// the second attempt goes without ?t= in case the host dislikes query strings
 		const query = attempt === 1 ? '' : `?t=${Date.now()}`
-		const res = await fetch(`${slash(url)}index.json${query}`, { signal: controller.signal })
+		const res = await fetch(`${indexUrl(url)}${query}`, { signal: controller.signal })
 		if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { permanent: res.status < 500 && res.status !== 429 })
 		const limited = !largeAllowed.has(url)
 		if (limited && Number(res.headers.get('content-length')) > MAX_INDEX_BYTES) throw tooLarge()

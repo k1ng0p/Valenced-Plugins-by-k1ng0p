@@ -92,7 +92,10 @@ export const ALERT_MODES: Record<AlertMode, { button: string; summary: string }>
 export const NOTICE =
 	'The repositories listed here are made by the community and are not reviewed by Valenced or Discord. A plugin can access your account and run code inside this app. Only install plugins from authors you trust, read the source before you install, and use them at your own risk.'
 
-export const slash = (url: string) => url.replace(/\/*$/, '/')
+// a repository address is either a folder that holds index.json or the index.json itself
+const isIndexFile = (url: string) => /\.json$/i.test(url)
+export const slash = (url: string) => (isIndexFile(url) ? url : url.replace(/\/*$/, '/'))
+export const indexUrl = (url: string) => (isIndexFile(url) ? url : `${slash(url)}index.json`)
 export const COMMUNITY_REPO = 'https://community.valenced.app/'
 
 // comes with Valenced itself and can't be removed, so it is always listed, and always last

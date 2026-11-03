@@ -49,6 +49,12 @@
       "badges": ["Trusted", "Ports"]
     },
     {
+      "url": "https://otkusteyler.github.io/btmc727-s-Valenced-plugins-/",
+      "source": "https://github.com/OTKUSteyler/btmc727-s-Valenced-plugins-",
+      "discord": "554071670143451176",
+      "badges": ["Trusted", "Ports"]
+    },
+    {
       "url": "https://valenced.tralwdwd.dev/",
       "source": "https://github.com/tralwdwd/valenced-plugins",
       "discord": "1278723517436788897",
@@ -109,16 +115,22 @@
       "badges": ["Trusted", "Developer", "Popular"]
     },
     {
+      "url": "https://alpine-vortex.github.io/valenced-rain/index.json",
+      "source": "https://github.com/alpine-vortex/valenced-rain",
+      "discord": "",
+      "badges": ["Themes"]
+    },
+    {
       "url": "https://lisaexists.github.io/valenced-plugins/",
       "source": "https://github.com/LisaExists/valenced-plugins",
       "discord": "836161010053283890",
       "badges": ["Ports"]
     },
     {
-      "url": "https://otkusteyler.github.io/btmc727-s-Valenced-plugins-/",
-      "source": "https://github.com/OTKUSteyler/btmc727-s-Valenced-plugins-",
-      "discord": "554071670143451176",
-      "badges": ["Trusted", "Ports"]
+      "url": "https://valenced-plugins.655.workers.dev/index.json",
+      "source": "https://github.com/6-5-5/valenced-plugins",
+      "discord": "783754042476068914",
+      "badges": ["Utility"]
     },
     {
       "url": "https://marklong0467.github.io/EskimoPlugins/",

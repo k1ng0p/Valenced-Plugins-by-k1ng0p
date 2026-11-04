@@ -1,4 +1,9 @@
 {
+  "note": {
+  "title": "Plugin Browser is moving",
+  "text": "Plugin Browser is moving to its own repo and will be removed from my main repo in a few days. Check my GitHub for any updates, or DM me.",
+  "level": "warning"
+  },
   "repos": [
     {
       "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/",

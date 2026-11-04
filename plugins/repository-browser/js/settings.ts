@@ -27,7 +27,7 @@ import {
 } from './data'
 import type { SeenEntry } from './data'
 import type { FeedItem, UpdateItem } from './sheets'
-import { THEMES_SETTINGS, THEME_SUPPORT, available, blocked, checkInstall, install, installMany, openPluginSettings, pendingReload, reloadNames, putRepos, readState, toggle, toggleMany, uninstall, uninstallMany, updatePlugins } from './valenced'
+import { THEMES_SETTINGS, THEME_SUPPORT, available, blocked, checkInstall, install, installMany, openPluginSettings, forcedReload, pendingReload, reloadNames, putRepos, readState, toggle, toggleMany, uninstall, uninstallMany, updatePlugins } from './valenced'
 import type { BulkItem } from './valenced'
 import type { ValencedState } from './valenced'
 import { BUILT_IN_NOTE, OWNER_ID, native, SELF_ID, SOURCE_URL, confirm, setHaptics, tap, COMMUNITY_REPO, DAY, KINDS, PAGE_SIZE, SORTS, ago, asset, compatibilityWarning, copyToClipboard, fail, friendlyError, h, hostOf, icon, inform, isBuiltIn, kindOf, modal, problemsText, recentProblems, reportError, slash } from './shared'
@@ -215,14 +215,6 @@ function useBrowser() {
 	const alertMode = (url: string): AlertMode => data?.alerts?.[url] ?? 'news'
 	const pings = pendingByKind(data, catalog)
 
-	const pluginName = (id: string) => {
-		for (const repo of catalog) {
-			const listed = listings.get(repo.url)?.plugins.find(plugin => plugin.id === id)
-			if (listed) return listed.name
-		}
-		return id
-	}
-
 	const openAbout = () =>
 		openAboutSheet({
 			name: authorNames[OWNER_ID] || 'k1ng_op',
@@ -249,7 +241,7 @@ function useBrowser() {
 		if (!list.length || updatingIds.length) return
 		setUpdatingIds(ids)
 		try {
-			await updatePlugins(list.map(info => ({ id: info.id, name: pluginName(info.id), installed: info.installed, available: info.available, channel: info.channel })))
+			await updatePlugins(list.map(info => ({ id: info.id, name: listedName(info.id), installed: info.installed, available: info.available, channel: info.channel })))
 		} finally {
 			setUpdatingIds([])
 		}
@@ -570,11 +562,13 @@ function useBrowser() {
 			return
 		}
 		let cancelled = false
+		const entry = addedRepo(current.url)
 		const known: Record<string, string> = {}
 		const queue: { plugin: ListedPlugin; key: string }[] = []
 		for (const plugin of (listings.get(current.url)?.plugins ?? []).slice(0, limit)) {
 			if (state.installed.has(plugin.id) || isLegacy(plugin)) continue
-			const key = `${checkKey(current, plugin)}|${installedIds}`
+			// what is installed only matters to plugins that depend on something
+			const key = plugin.requires?.length ? `${checkKey(current, plugin)}|${installedIds}` : checkKey(current, plugin)
 			if (!installChecks.has(key)) queue.push({ plugin, key })
 			else if (installChecks.get(key)) known[checkKey(current, plugin)] = installChecks.get(key) as string
 		}
@@ -583,7 +577,7 @@ function useBrowser() {
 		const worker = async () => {
 			for (let next = queue.shift(); next; next = queue.shift()) {
 				if (cancelled) return
-				const reason = await checkInstall(current.url, next.plugin)
+				const reason = await checkInstall(current.url, next.plugin, undefined, entry)
 				installChecks.set(next.key, reason)
 				if (reason && !cancelled) setChecks(previous => ({ ...previous, [checkKey(current, next.plugin)]: reason }))
 			}
@@ -838,8 +832,11 @@ const listedName = (id: string) =>
 // shown for as long as a plugin only takes effect after a reload, tapping it reloads Valenced
 function reloadRow(b: Ctx) {
 	const { TableRow, TableRowGroup } = Design
-	const flagged = Object.entries(b.state?.enabled ?? {}).filter(([id, entry]) => entry?.pendingReload && b.state?.installed.has(id)).map(([id]) => id)
-	const names = [...new Set([...reloadNames.keys(), ...flagged])].map(id => reloadNames.get(id) ?? listedName(id))
+	const installed = b.state?.installed
+	const flagged = (id: string) => !!b.state?.enabled[id]?.pendingReload
+	// a plugin whose flag has cleared, because it was switched back, doesn't need a reload any more
+	const remembered = [...reloadNames.keys()].filter(id => !installed?.has(id) || flagged(id) || forcedReload.has(id))
+	const names = [...new Set([...remembered, ...Object.keys(b.state?.enabled ?? {}).filter(id => installed?.has(id) && flagged(id))])].map(id => reloadNames.get(id) ?? listedName(id))
 	if (!names.length) return null
 
 	return h(
@@ -1126,6 +1123,8 @@ export function Browser() {
 			{
 				style: pagerStyle,
 				pointerEvents: showTabs ? 'auto' : 'none',
+				importantForAccessibility: showTabs ? 'auto' : 'no-hide-descendants',
+				accessibilityElementsHidden: !showTabs,
 				onLayout: (e: any) => {
 					const { width, height } = e.nativeEvent.layout
 					if (showTabs && width > 0 && height > 0) setPageSize(previous => (previous.width === width && previous.height === height ? previous : { width, height }))

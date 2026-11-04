@@ -306,8 +306,8 @@ async function fetchIndex(url: string, attempt: number, timeout: number) {
 	const timer = setTimeout(() => controller.abort(), timeout)
 	try {
 		// the second attempt goes without ?t= in case the host dislikes query strings
-		const query = attempt === 1 ? '' : `?t=${Date.now()}`
-		const res = await fetch(`${indexUrl(url)}${query}`, { signal: controller.signal })
+		const target = indexUrl(url)
+		const res = await fetch(attempt === 1 ? target : `${target}${target.includes('?') ? '&' : '?'}t=${Date.now()}`, { signal: controller.signal })
 		if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { permanent: res.status < 500 && res.status !== 429 })
 		const limited = !largeAllowed.has(url)
 		if (limited && Number(res.headers.get('content-length')) > MAX_INDEX_BYTES) throw tooLarge()
@@ -424,8 +424,8 @@ export function load(url: string) {
 		})
 		.catch((e: any) => {
 			const err = e?.name === 'AbortError' ? 'Request timed out' : errorMessage(e)
-			// being offline or slow is routine, anything else about a repository is worth a report
-			if (e?.name === 'AbortError' || /network request failed/i.test(err)) logProblem(`load ${url}`, e)
+			// being offline, slow or broken on the repository's side is shown on the repository, anything else is worth a report
+			if (e?.name === 'AbortError' || e?.permanent || e instanceof SyntaxError || /network request failed/i.test(err)) logProblem(`load ${url}`, e)
 			else reportError(e, `load ${url}`)
 			const previous = listings.get(url)
 			listings.set(url, previous && !previous.err ? { ...previous, stale: err, tooLarge: !!e?.tooLarge } : { name: url, plugins: [], err, tooLarge: !!e?.tooLarge })

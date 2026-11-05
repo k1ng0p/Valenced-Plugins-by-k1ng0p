@@ -1,9 +1,9 @@
 {
   "note": {
   "title": "Plugin Browser is moving",
-  "text": "Plugin Browser is moving to its own repo and will be removed from my main repo in a few days. Check my GitHub for any updates, or DM me.",
+  "text": "Plugin Browser is moving to its own separate repo and will be removed from my main repo in a few days, at ushie's request.\n\nValenced is centralized first, and Plugin Browser lets you add repos in one tap, which skips the manual step that Valenced's trust system relies on. So it won't be reachable from the Valenced server.\n\nIt isn't going away. It stays available as its own project. Check my GitHub for the new link and any updates.",
   "level": "warning"
-  },
+},
   "repos": [
     {
       "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/",

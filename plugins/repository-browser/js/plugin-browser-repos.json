@@ -1,4 +1,9 @@
 {
+  "note": {
+  "title": "Plugin Browser has moved",
+  "text": "Plugin Browser has been moved to a new, separate repository and is no longer available here.\n\nCheck my GitHub (k1ng0p) for the new repository, or DM me for new Repo Link. \n\nIMPORTANT: Do not ask for Plugin Browser support, troubleshooting, or assistance in the Valenced server. Any requests for Plugin Browser-related support in this server may result in moderation action.",
+  "level": "warning"
+  },
   "repos": [
     {
       "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/",

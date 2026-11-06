@@ -12,6 +12,20 @@ Add this repository through **Settings → General → Plugins → Add Repositor
 https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/
 ```
 
+---
+
+> [!IMPORTANT]
+> **Plugin Browser has moved to a new repository!**
+>
+> Plugin Browser is no longer maintained or distributed through this repository. It now has its own separate repository.
+>
+> - **Source:** https://github.com/k1ng0p/Plugin-Browser-Valenced
+> - **Installation URL:** `https://k1ng0p.github.io/Plugin-Browser-Valenced/`
+>
+> Make sure to use the new installation URL to add Plugin Browser to Valenced.
+
+---
+
 ## What's Inside
 
 ### ✦ Original

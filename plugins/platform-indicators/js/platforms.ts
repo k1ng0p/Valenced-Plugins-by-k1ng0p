@@ -37,6 +37,7 @@ interface SessionsStore {
 interface PresenceStore {
 	getState?(): { clientStatuses?: Record<string, Statuses> } | undefined
 	getStatus?(userId?: string): string | undefined
+	getActivities?(userId: string): { type?: number }[] | undefined
 }
 
 interface SelfPresenceStore {
@@ -48,6 +49,7 @@ const FallbackColors: Record<string, string> = {
 	dnd: '#f23f43',
 	idle: '#f0b232',
 	offline: '#80848e',
+	streaming: '#593695',
 }
 
 const StatusTokens: Record<string, string> = {
@@ -240,6 +242,17 @@ export function getStatuses(userId: string): Statuses | undefined {
 	}
 
 	return statuses
+}
+
+const StreamingActivityType = 1
+
+export function isStreaming(userId: string): boolean {
+	const { PresenceStore } = Stores as unknown as {
+		PresenceStore?: PresenceStore
+	}
+	return !!PresenceStore?.getActivities?.(userId)?.some(
+		activity => activity?.type === StreamingActivityType,
+	)
 }
 
 export function pickDotPlatform(statuses: Statuses): string | null {

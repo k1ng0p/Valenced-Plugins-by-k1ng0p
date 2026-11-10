@@ -10,6 +10,7 @@ import {
 	dotAllowedForContext,
 	findAsset,
 	getStatuses,
+	isStreaming,
 	PlatformListShift,
 	PlatformShift,
 	pickDotPlatform,
@@ -71,14 +72,17 @@ function PlatformIcon({
 	)
 }
 
+const signature = (userId: string) =>
+	`${statusSignature(getStatuses(userId))}|${isStreaming(userId)}`
+
 function useStatusRerender(userId: string) {
 	const rerender = useReRender()
 
 	useEffect(() => {
-		let last = statusSignature(getStatuses(userId))
+		let last = signature(userId)
 
 		return subscribe(() => {
-			const next = statusSignature(getStatuses(userId))
+			const next = signature(userId)
 			if (next === last) return
 			last = next
 			rerender()
@@ -99,6 +103,9 @@ export function StatusIcons({
 	const dotPlatform = settings.experimentalStatusDot
 		? pickDotPlatform(statuses)
 		: null
+	const streamingPlatform = isStreaming(userId)
+		? pickDotPlatform(statuses)
+		: null
 
 	return (
 		<>
@@ -108,7 +115,10 @@ export function StatusIcons({
 					<PlatformIcon
 						key={platform}
 						platform={platform}
-						color={statusColor(statuses[platform], settings.fallbackColors)}
+						color={statusColor(
+							platform === streamingPlatform ? 'streaming' : statuses[platform],
+							settings.fallbackColors,
+						)}
 						iconSize={size}
 					/>
 				))}
@@ -185,7 +195,11 @@ function plateShapes(
 
 interface StatusDotProps {
 	userId: string
-	original: ReactElement<{ size?: number; style?: StyleProp<ViewStyle> }>
+	original: ReactElement<{
+		size?: number
+		style?: StyleProp<ViewStyle>
+		streaming?: boolean
+	}>
 	size?: string
 }
 
@@ -290,7 +304,12 @@ export function StatusDot({ userId, original, size }: StatusDotProps) {
 			>
 				<PlatformIcon
 					platform={platform}
-					color={statusColor(statuses[platform], settings.fallbackColors)}
+					color={statusColor(
+						original.props.streaming || isStreaming(userId)
+							? 'streaming'
+							: statuses[platform],
+						settings.fallbackColors,
+					)}
 					width={width}
 					height={height}
 					forDot

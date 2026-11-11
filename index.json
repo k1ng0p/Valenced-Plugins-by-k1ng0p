@@ -33,7 +33,7 @@
       "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
       "icon": "MagicWandIcon",
       "channels": {
-        "latest": "1.2.0"
+        "latest": "1.2.1"
       },
       "versions": {
         "1.0.0": {
@@ -79,6 +79,19 @@
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.junk-cleanup@1.2.0.zip",
           "sha256": "bd151ba9fa1b6581b3a9f8f75a2cfcf95dd54651299fc7f436e8753698bf38b1",
           "size": 5757,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.2.1": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.junk-cleanup@1.2.1.zip",
+          "sha256": "06ffc7e288e1cf4aa2e7540e23e19cbbc2dbefce281208d79e30fc5f21e911bd",
+          "size": 6180,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"

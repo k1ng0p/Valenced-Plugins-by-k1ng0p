@@ -93,8 +93,11 @@ export default function patchChat(
 	const authors = new Map<string, string>()
 	// Message ID to the icons native was last told about, as JSON
 	const sent = new Map<string, string>()
+	let nativeFailed = false
 
 	const push = (ids: Iterable<string>) => {
+		if (nativeFailed) return
+
 		const updates: ChatIcons = {}
 		// The icons of an author are worked out once, however many messages they have
 		const byAuthor = new Map<string, ChatIcon[]>()
@@ -113,7 +116,15 @@ export default function patchChat(
 			updates[id] = icons
 		}
 
-		if (Object.keys(updates).length) putChatIcons(updates)
+		if (!Object.keys(updates).length) return
+
+		try {
+			putChatIcons(updates)
+		} catch (e) {
+			// Native has no `put` when its part failed to start, so retrying on every message only repeats it
+			nativeFailed = true
+			reportError(e)
+		}
 	}
 
 	const update = () => {
@@ -127,7 +138,9 @@ export default function patchChat(
 	cleanup(
 		subscribe(update),
 		connectDispatcher(),
-		() => clearChatIcons(),
+		() => {
+			if (!nativeFailed) clearChatIcons()
+		},
 		// modules/messages/native/renderer/RowGenerator.tsx
 		getModules(withName<RowManager>('RowManager'), ({ prototype }) => {
 			cleanup(

@@ -12,8 +12,6 @@ val platformIndicators = plugin {
     var hooks: ChatHooks? = null
 
     start {
-        hooks = ChatHooks(dexFinder) { errors.tryEmit(it) }
-
         registerNativeMethod("k1ngop.platformindicators.put") { args ->
             val json by args.asDelegate().string()
             hooks?.put(json)
@@ -23,6 +21,13 @@ val platformIndicators = plugin {
         registerNativeMethod("k1ngop.platformindicators.clear") {
             hooks?.clear()
             null
+        }
+
+        // After the methods, so a failing lookup is reported instead of leaving them unregistered
+        try {
+            hooks = ChatHooks(dexFinder) { errors.tryEmit(it) }
+        } catch (e: Exception) {
+            errors.tryEmit(e)
         }
     }
 

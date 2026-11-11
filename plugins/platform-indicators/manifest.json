@@ -6,7 +6,7 @@
 	"icon": "UserPlatformIcon",
 	"author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
 	"contributors": ["Martinz64"],
-	"version": "1.2.1",
+	"version": "1.2.2",
 	"dependencies": {
 		"valenced.api": {
 			"version": ">=1 <2"
@@ -16,6 +16,10 @@
 		}
 	},
 	"dist": {
-		"script": "index.js"
+		"script": "index.js",
+		"android": {
+			"path": "plugin.jar",
+			"class": "me.k1ngop.valenced.platformindicators.PlatformIndicators"
+		}
 	}
 }

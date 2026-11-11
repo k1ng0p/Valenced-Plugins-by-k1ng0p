@@ -9,6 +9,7 @@ export interface Settings {
 	experimentalStatusDot: boolean
 	dotYouBar: boolean
 	statusDotInlineRemaining: boolean
+	chatIcons: boolean
 }
 
 export const DefaultSettings: Settings = {
@@ -20,6 +21,7 @@ export const DefaultSettings: Settings = {
 	experimentalStatusDot: true,
 	dotYouBar: true,
 	statusDotInlineRemaining: true,
+	chatIcons: false,
 }
 
 type Api = PluginApi<{ jsonStorage: Settings }>

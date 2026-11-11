@@ -8,6 +8,7 @@ import { after, instead } from '@valenced/patcher'
 import { findInTree } from '@valenced/utils/tree'
 import { createElement } from 'react'
 import { View } from 'react-native'
+import patchChat from './chat'
 import { StatusDot, StatusIcons, StatusIconsRow } from './components'
 import {
 	dotAllowedForContext,
@@ -116,6 +117,8 @@ export default plugin<{ jsonStorage: Settings }>({
 		cleanup(stopPresence)
 
 		if (plugin.startedLate) plugin.requireReload()
+
+		patchChat(cleanup)
 
 		cleanup(
 			getModules(withExactName('ChannelHeader'), mod => {

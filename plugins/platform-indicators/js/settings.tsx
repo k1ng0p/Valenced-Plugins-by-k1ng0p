@@ -82,6 +82,14 @@ export default function SettingsComponent({
 						/>
 					))}
 				</TableRowGroup>
+				<TableRowGroup title="Chat">
+					<TableSwitchRow
+						label="Show platform icons in chat"
+						subLabel="Next to the usernames above messages (Needs a reload)"
+						value={settings.chatIcons}
+						onValueChange={chatIcons => update({ chatIcons })}
+					/>
+				</TableRowGroup>
 				<TableRowGroup title="Appearance">
 					<TableSwitchRow
 						label="Theme compatibility mode"

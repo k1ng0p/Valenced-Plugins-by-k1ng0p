@@ -1,8 +1,22 @@
 import { ToastActionCreators } from '@valenced/discord/actions'
-import { onFluxEventDispatched, Stores } from '@valenced/discord/flux'
+import { Dispatcher } from '@valenced/discord/common/flux'
+import { ImportTrackerModuleId } from '@valenced/discord/common/import-tracker'
+import { LoggerModuleId } from '@valenced/discord/common/logger'
+import {
+	onFluxEventDispatched,
+	Stores,
+	withStoreName,
+} from '@valenced/discord/flux'
+import { lookupModule } from '@valenced/modules/finders'
+import {
+	withDependencies,
+	withName,
+	withProps,
+} from '@valenced/modules/finders/filters'
 import SettingsComponent from './settings'
 import type { DiscordModules } from '@valenced/discord/types'
 import type { JsonStorage } from '@valenced/json-storage'
+import type { ImageSourcePropType } from 'react-native'
 
 const DEBUG: boolean = false
 
@@ -186,6 +200,69 @@ export function isTracked(id: string) {
 export function getUserName(id: string) {
 	const user = getUserStore().getUser(id)
 	return user?.globalName || user?.username || id
+}
+
+export function getAvatarSource(id: string): ImageSourcePropType | undefined {
+	const avatar = getUserStore().getUser(id)?.getAvatarURL?.(null, 64, false)
+	return typeof avatar === 'string' ? { uri: avatar } : avatar
+}
+
+type Http = {
+	HTTP: { get(options: { url: string }): Promise<{ body?: unknown }> }
+}
+type ProfileSheet = (props: { userId: string }) => void
+
+let http: Http | undefined
+let profileSheet: ProfileSheet | undefined
+
+/** Tracked users Discord hasn't loaded yet have no name or avatar to show. */
+export async function loadUser(id: string) {
+	try {
+		http ??= lookupModule(
+			withProps<Http & { post: unknown }>('HTTP', 'post'),
+		)[0]
+		if (!http) throw new Error('HTTP module not found')
+
+		const { body } = await http.HTTP.get({ url: `/users/${id}` })
+		Dispatcher.dispatch({ type: 'USER_UPDATE', user: body })
+	} catch (error) {
+		reportError(error)
+	}
+}
+
+function findProfileSheet() {
+	const named = withName<ProfileSheet>('showUserProfileActionSheet')
+	const { ordered, relative } = withDependencies
+	const [, UserStoreId] = lookupModule(withStoreName('UserStore'))
+
+	const [exact] = lookupModule(
+		named.and(
+			withDependencies(
+				ordered([
+					LoggerModuleId,
+					UserStoreId,
+					relative(1),
+					relative(2),
+					relative(3),
+					ImportTrackerModuleId,
+				]),
+			),
+		),
+	)
+
+	// the exact match depends on Discord's module layout, the name alone is the fallback
+	return exact ?? lookupModule(named)[0]
+}
+
+export function openUserProfile(userId: string) {
+	try {
+		profileSheet ??= findProfileSheet()
+		if (!profileSheet) throw new Error('Profile sheet module not found')
+
+		profileSheet({ userId })
+	} catch (error) {
+		reportError(error)
+	}
 }
 
 /** Toasts queue, but one whose key is already on screen is dropped. */

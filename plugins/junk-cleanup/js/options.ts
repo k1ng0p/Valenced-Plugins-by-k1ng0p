@@ -65,6 +65,50 @@ export const GROUPS = [
 		],
 	},
 	{
+		title: 'Profile menu',
+		options: [
+			{
+				key: 'profileShopLook',
+				label: 'Shop This Look',
+				hint: 'Row in the profile three-dot menu',
+				preset: true,
+			},
+			{
+				key: 'profileInvite',
+				label: 'Invite to Server',
+				hint: 'Row in the profile three-dot menu',
+				preset: true,
+			},
+			{
+				key: 'profileCopyUsername',
+				label: 'Copy Username',
+				hint: 'Row in the profile three-dot menu',
+				preset: true,
+			},
+			{
+				key: 'profileApps',
+				label: 'Apps',
+				hint: 'Row in the profile three-dot menu',
+				preset: true,
+			},
+			{
+				key: 'profileIgnore',
+				label: 'Ignore',
+				hint: 'Row in the profile three-dot menu',
+			},
+			{
+				key: 'profileBlock',
+				label: 'Block',
+				hint: 'Row in the profile three-dot menu',
+			},
+			{
+				key: 'profileReport',
+				label: 'Report User Profile',
+				hint: 'Row in the profile three-dot menu',
+			},
+		],
+	},
+	{
 		title: 'Message menu',
 		options: [
 			{

@@ -3,7 +3,7 @@ import { ActionSheetActionCreators } from '@valenced/discord/actions'
 import { Design } from '@valenced/discord/design'
 import { SettingListRenderer } from '@valenced/discord/modules/settings/renderer'
 import { getModuleWithImportedPath } from '@valenced/discord/utils/modules/finders'
-import { getModules } from '@valenced/modules/finders'
+import { getModules, lookupModule } from '@valenced/modules/finders'
 import { withName, withProps } from '@valenced/modules/finders/filters'
 import { before, instead } from '@valenced/patcher'
 import { React, ReactJSXRuntime } from '@valenced/react'
@@ -577,6 +577,85 @@ function messageRows(env: Env) {
 }
 
 // ---------------------------------------------------------------------------
+// Profile three-dot menu
+// ---------------------------------------------------------------------------
+
+interface IntlModule {
+	intl: { string(message: unknown): string }
+	t: Record<string, unknown>
+	getAvailableLocales(): unknown
+}
+
+interface MenuItem {
+	label: string
+}
+
+/** Rows have no icon or id, so they are matched by label through Discord's message hashes */
+const PROFILE_MENU_HASHES = new Map<string, OptionKey>([
+	['xNdRDO', 'profileShopLook'],
+	['Sd8Ixw', 'profileInvite'],
+	['y5MwJy', 'profileCopyUsername'],
+	['PHjkRE', 'profileApps'],
+	['ytCpKs', 'profileIgnore'],
+	['l4Emac', 'profileBlock'],
+	['A1MM3D', 'profileReport'],
+])
+
+let profileMenuLabels: Map<string, OptionKey> | undefined
+
+function getProfileMenuLabels() {
+	if (profileMenuLabels) return profileMenuLabels
+	const [intl] = lookupModule(
+		withProps<IntlModule>('intl', 't', 'getAvailableLocales'),
+	)
+	if (!intl) return undefined
+	return (profileMenuLabels = new Map(
+		[...PROFILE_MENU_HASHES].map(([hash, option]) => [
+			intl.intl.string(intl.t[hash]),
+			option,
+		]),
+	))
+}
+
+/** Only the profile menu has a Copy Username row, which tells it apart from other menus */
+function withoutHiddenProfileRows(items: Array<MenuItem | MenuItem[]>) {
+	const options = getProfileMenuLabels()
+	if (!options?.size) return undefined
+	if (
+		!items
+			.flat()
+			.some(item => options.get(item.label) === 'profileCopyUsername')
+	)
+		return undefined
+
+	const keep = (item: MenuItem) => {
+		const option = options.get(item.label)
+		return !(option && isOn(option))
+	}
+	return items
+		.flatMap(entry =>
+			Array.isArray(entry) ? [entry.filter(keep)] : keep(entry) ? [entry] : [],
+		)
+		.filter(entry => !Array.isArray(entry) || entry.length)
+}
+
+function profileMenu(env: Env) {
+	env.cleanup(
+		insteadJSX(Design.ContextMenu as any, (args, jsx) => {
+			try {
+				const items = Array.isArray(args[1]?.items)
+					? withoutHiddenProfileRows(args[1].items)
+					: undefined
+				if (items) return jsx(args[0], { ...args[1], items }, args[2])
+			} catch (e) {
+				env.fail(e)
+			}
+			return jsx(args[0], args[1], args[2])
+		}),
+	)
+}
+
+// ---------------------------------------------------------------------------
 // Attach panel buttons
 // ---------------------------------------------------------------------------
 
@@ -724,6 +803,7 @@ export function installPatches(env: Env) {
 		settingsPage,
 		trackMessageSheet,
 		messageRows,
+		profileMenu,
 		componentRules,
 		attachPanel,
 		serverHeader,

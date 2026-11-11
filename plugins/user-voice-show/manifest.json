@@ -1,0 +1,24 @@
+{
+	"format": 1,
+	"id": "k1ngop.user-voice-show",
+	"name": "User Voice Show",
+	"description": "Shows an indicator when a user is in a voice channel.",
+	"icon": "VoiceNormalSpoilerIcon",
+	"author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js",
+		"android": {
+			"path": "plugin.jar",
+			"class": "me.k1ngop.valenced.uservoiceshow.UserVoiceShow"
+		}
+	}
+}

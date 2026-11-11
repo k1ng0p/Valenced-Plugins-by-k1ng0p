@@ -306,6 +306,30 @@
         }
       }
     },
+    "k1ngop.user-voice-show": {
+      "name": "User Voice Show",
+      "description": "Shows an indicator when a user is in a voice channel.",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "icon": "VoiceNormalSpoilerIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.user-voice-show@1.0.0.zip",
+          "sha256": "c478951dcf2ac4e961609599caa02ede1617b98a19cda2f1dd98011e94527069",
+          "size": 22374,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
     "k1ngop.valid-user": {
       "name": "ValidUser",
       "description": "Fixes unresolved user mentions like @unknown-user to a normal clickable mention.",

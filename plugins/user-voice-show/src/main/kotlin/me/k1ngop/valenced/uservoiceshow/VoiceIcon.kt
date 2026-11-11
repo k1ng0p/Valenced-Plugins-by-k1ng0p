@@ -25,7 +25,7 @@ internal class VoiceIcon(
 
     private val gap = ICON_GAP_DP * context.resources.displayMetrics.density
 
-    private var host: View? = null
+    private var host: ViewGroup? = null
     private var anchor: View? = null
 
     private val update = Runnable { reposition() }
@@ -37,7 +37,7 @@ internal class VoiceIcon(
         addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post(update) }
     }
 
-    fun takePlaceOf(host: View, anchor: View) {
+    fun takePlaceOf(host: ViewGroup, anchor: View) {
         this.host = host
         this.anchor = anchor
         anchor.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> post(update) }

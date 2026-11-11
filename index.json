@@ -388,7 +388,7 @@
       "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
       "icon": "EyeIcon",
       "channels": {
-        "latest": "1.1.0"
+        "latest": "1.2.0"
       },
       "versions": {
         "1.0.0": {
@@ -408,6 +408,19 @@
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.watchlist@1.1.0.zip",
           "sha256": "f6583ae74eb1ed88036c8a51d1e8f3c5f40e988145963f572c793e557d0a3166",
           "size": 3612,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.2.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.watchlist@1.2.0.zip",
+          "sha256": "d29db34bd5c33713ac6aefdd7efdeca3a4f538da6168971c61c38d10cc92c8c1",
+          "size": 4499,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"

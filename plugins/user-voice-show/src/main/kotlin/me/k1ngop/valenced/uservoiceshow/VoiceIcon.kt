@@ -8,6 +8,8 @@ import android.widget.ImageView
 
 internal const val ICON_SIZE_DP = 16f
 internal const val ICON_GAP_DP = 4f
+// The text of the views next to the icon sits above the center of their box
+private const val ICON_LIFT_DP = 2f
 
 internal data class VoiceBadge(val resource: String, val color: Int)
 
@@ -23,7 +25,8 @@ internal class VoiceIcon(
 
     private var shown: VoiceBadge? = null
 
-    private val gap = ICON_GAP_DP * context.resources.displayMetrics.density
+    private val density = context.resources.displayMetrics.density
+    private val gap = ICON_GAP_DP * density
 
     private var host: ViewGroup? = null
     private var anchor: View? = null
@@ -108,16 +111,18 @@ internal class VoiceIcon(
         }
         if (width == 0) return
 
-        var previousRight = 0
+        var previous: View? = null
         for (i in 0 until row.childCount) {
             val child = row.getChildAt(i)
             if (child === anchor || child === this || child.visibility != VISIBLE) continue
-            if (child.right <= anchor.left) previousRight = maxOf(previousRight, child.right)
+            if (child.right <= anchor.left && child.right >= (previous?.right ?: 0)) previous = child
         }
 
-        val left = maxOf(x + previousRight.toFloat(), overlayRight) + gap
+        val left = maxOf(x + (previous?.right ?: 0).toFloat(), overlayRight) + gap
+        // Centered on the view before the anchor, the timestamp sits lower than the name and tags
+        val line = previous ?: anchor
         translationX = left
-        translationY = rowTop + (anchor.height - height) / 2f
+        translationY = y + line.top + (line.height - height) / 2f - ICON_LIFT_DP * density
         anchor.translationX = maxOf(anchor.translationX, left + width + gap - anchorLeft)
     }
 }

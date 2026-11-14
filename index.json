@@ -149,7 +149,7 @@
       ],
       "icon": "UserPlatformIcon",
       "channels": {
-        "latest": "1.2.3"
+        "latest": "1.2.4"
       },
       "versions": {
         "1.0.0": {
@@ -221,6 +221,19 @@
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.platform-indicators@1.2.3.zip",
           "sha256": "e5d03a1f7943fb2bbca86b58dfca7f1fd0c224caef47548dff6134f50d1c8f25",
           "size": 23262,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.2.4": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.platform-indicators@1.2.4.zip",
+          "sha256": "12f106dd4988b6add0f2664fbee2507aed6de2d6077a3d68ff79fb347f23ba54",
+          "size": 23273,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"

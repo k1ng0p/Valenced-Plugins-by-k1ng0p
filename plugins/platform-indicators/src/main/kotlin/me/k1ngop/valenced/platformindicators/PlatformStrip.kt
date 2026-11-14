@@ -10,6 +10,8 @@ import android.widget.LinearLayout
 
 private const val ICON_SIZE_DP = 16f
 private const val ICON_GAP_DP = 4f
+// The tag's text sits a little above its box's center, so the icons are lifted to match
+private const val ICON_LIFT_DP = 2f
 
 /** A platform's icon, as the name of its drawable resource and its ARGB color. */
 internal data class PlatformIcon(val resource: String, val color: Int)
@@ -80,7 +82,7 @@ internal class PlatformStrip(
         translationX = x + (previous?.right ?: 0) + gap
         // Centered on the view before the anchor (the server tag), not the timestamp, which sits lower
         val line = previous ?: anchor
-        translationY = y + line.top + (line.height - height) / 2f
+        translationY = y + line.top + (line.height - height) / 2f - ICON_LIFT_DP * density
         anchor.translationX = width + gap
     }
 

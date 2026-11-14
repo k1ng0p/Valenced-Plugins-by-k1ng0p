@@ -47,9 +47,11 @@ function resourceName(platform: string) {
 	const assetId = findAsset(key, false)
 	if (!assetId) return null
 
-	// Bundled assets are drawable resources, and their URI is the resource's name
+	// Bundled assets are drawable resources and their URI is the resource's name.
+	// Icon packs replace them with files named after the drawable they override.
 	const { uri } = Image.resolveAssetSource(assetId)
-	if (!/^\w+$/.test(uri)) {
+	const name = uri.split('/').pop()?.replace(/\.\w+$/, '') ?? ''
+	if (!/^\w+$/.test(name)) {
 		reportError(
 			new Error(`Icon of "${platform}" is not a drawable resource: ${uri}`),
 		)
@@ -57,8 +59,8 @@ function resourceName(platform: string) {
 		return null
 	}
 
-	resourceNames.set(key, uri)
-	return uri
+	resourceNames.set(key, name)
+	return name
 }
 
 function iconsOf(userId: string) {

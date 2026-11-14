@@ -69,16 +69,18 @@ internal class PlatformStrip(
             view = view.parent as? View ?: return
         }
 
-        var previousRight = 0
+        var previous: View? = null
         for (i in 0 until row.childCount) {
             val child = row.getChildAt(i)
             if (child === anchor || child === this || child.visibility != VISIBLE) continue
-            if (child.right <= anchor.left) previousRight = maxOf(previousRight, child.right)
+            if (child.right <= anchor.left && child.right >= (previous?.right ?: 0)) previous = child
         }
 
         val gap = ICON_GAP_DP * density
-        translationX = x + previousRight + gap
-        translationY = y + anchor.top + (anchor.height - height) / 2f
+        translationX = x + (previous?.right ?: 0) + gap
+        // Centered on the view before the anchor (the server tag), not the timestamp, which sits lower
+        val line = previous ?: anchor
+        translationY = y + line.top + (line.height - height) / 2f
         anchor.translationX = width + gap
     }
 

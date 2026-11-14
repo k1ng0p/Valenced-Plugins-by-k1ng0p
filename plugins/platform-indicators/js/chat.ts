@@ -44,7 +44,7 @@ function resourceName(platform: string) {
 	const known = resourceNames.get(key)
 	if (known !== undefined) return known
 
-	const assetId = findAsset(key, false)
+	const assetId = findAsset(key, key === 'mobile')
 	if (!assetId) return null
 
 	// Bundled assets are drawable resources and their URI is the resource's name.

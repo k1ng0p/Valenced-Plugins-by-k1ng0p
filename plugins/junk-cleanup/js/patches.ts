@@ -481,49 +481,78 @@ function hasChildNamed(children: unknown, name: string, depth = 3): boolean {
 	})
 }
 
+/** Every other element passes straight through the patch */
+const WATCHED_TYPES = new Set([
+	...COMPONENT_RULES.keys(),
+	...SHEET_COMPONENT_RULES.keys(),
+	'TableRowGroup',
+	'FastList',
+	'MediaKeyboardSpecialButton',
+	'PressableOpacity',
+])
+
+const typeNames = new WeakMap<object, string>()
+
+/** nameOfType for every element created would be wasted work, so it is looked up once per type */
+function cachedNameOf(type: unknown): string {
+	if (typeof type !== 'function' && (typeof type !== 'object' || !type))
+		return ''
+	let name = typeNames.get(type)
+	if (name === undefined) {
+		name = nameOfType(type)
+		typeNames.set(type, name)
+	}
+	return name
+}
+
 function componentRules(env: Env) {
 	for (const factory of ['jsx', 'jsxs'] as const)
 		env.cleanup(
 			instead(ReactJSXRuntime as any, factory, (args: any[], original: any) => {
-				if (!ui.settingsOpen) {
-					const name = nameOfType(args[0])
-					const option = COMPONENT_RULES.get(name)
-					if (option && isOn(option)) return null
-					if (ui.messageSheetOpen && args[1]?.message) {
-						const sheetOption = SHEET_COMPONENT_RULES.get(name)
-						if (sheetOption && isOn(sheetOption)) return null
-					}
-					// The "Transfer to Console" header goes together with its rows
-					if (
-						name === 'TableRowGroup' &&
-						isOn('voiceConsole') &&
-						hasChildNamed(args[1]?.children, CONSOLE_BUTTON)
-					)
-						return null
-					// Photo grid: shift the rows so removing the camera leaves no gap
-					if (
-						name === 'FastList' &&
-						isOn('attachCamera') &&
-						typeof args[1]?.renderItem === 'function' &&
-						(new Error().stack ?? '').includes('MediaKeyboard')
-					)
-						return original(
-							args[0],
-							{
-								...args[1],
-								renderItem: withoutCameraItem(env, args[1].renderItem),
-							},
-							args[2],
-						)
-					// The camera tile in the photo grid is a special button holding a camera icon
-					if (
-						name === 'MediaKeyboardSpecialButton' &&
-						isOn('attachCamera') &&
-						hasChildNamed(args[1]?.children, 'CameraIcon')
-					)
-						return null
+				const name = cachedNameOf(args[0])
+				if (!WATCHED_TYPES.has(name) || ui.settingsOpen)
+					return original(args[0], args[1], args[2])
+
+				const option = COMPONENT_RULES.get(name)
+				if (option && isOn(option)) return null
+				if (ui.messageSheetOpen && args[1]?.message) {
+					const sheetOption = SHEET_COMPONENT_RULES.get(name)
+					if (sheetOption && isOn(sheetOption)) return null
 				}
-				return original(...args)
+				// The "Transfer to Console" header goes together with its rows
+				if (
+					name === 'TableRowGroup' &&
+					isOn('voiceConsole') &&
+					hasChildNamed(args[1]?.children, CONSOLE_BUTTON)
+				)
+					return null
+				// Photo grid: shift the rows so removing the camera leaves no gap
+				if (
+					name === 'FastList' &&
+					isOn('attachCamera') &&
+					typeof args[1]?.renderItem === 'function' &&
+					(new Error().stack ?? '').includes('MediaKeyboard')
+				)
+					return original(
+						args[0],
+						{
+							...args[1],
+							renderItem: withoutCameraItem(env, args[1].renderItem),
+						},
+						args[2],
+					)
+				// The camera tile in the photo grid is a special button holding a camera icon
+				if (
+					name === 'MediaKeyboardSpecialButton' &&
+					isOn('attachCamera') &&
+					hasChildNamed(args[1]?.children, 'CameraIcon')
+				)
+					return null
+				if (name === 'PressableOpacity' && !ui.messageSheetOpen) {
+					const attach = attachOption(args[1]?.children)
+					if (attach && isOn(attach)) return null
+				}
+				return original(args[0], args[1], args[2])
 			}),
 		)
 }
@@ -668,30 +697,13 @@ const ATTACH_ICONS = new Map<string, OptionKey>([
 	['AttachmentIcon', 'attachFiles'],
 ])
 
-function attachPanel(env: Env) {
-	const optionOf = (children: unknown): OptionKey | undefined => {
-		for (const child of React.Children.toArray(children as any)) {
-			const icon = ATTACH_ICONS.get(
-				nameOfType((child as { type?: unknown })?.type),
-			)
-			if (icon) return icon
-		}
-	}
-
-	for (const factory of ['jsx', 'jsxs'] as const)
-		env.cleanup(
-			instead(ReactJSXRuntime as any, factory, (args: any[], original: any) => {
-				if (
-					!ui.settingsOpen &&
-					!ui.messageSheetOpen &&
-					nameOfType(args[0]) === 'PressableOpacity'
-				) {
-					const option = optionOf(args[1]?.children)
-					if (option && isOn(option)) return null
-				}
-				return original(...args)
-			}),
+function attachOption(children: unknown): OptionKey | undefined {
+	for (const child of React.Children.toArray(children as any)) {
+		const icon = ATTACH_ICONS.get(
+			nameOfType((child as { type?: unknown })?.type),
 		)
+		if (icon) return icon
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -805,7 +817,6 @@ export function installPatches(env: Env) {
 		messageRows,
 		profileMenu,
 		componentRules,
-		attachPanel,
 		serverHeader,
 	])
 		safely(env, () => install(env))

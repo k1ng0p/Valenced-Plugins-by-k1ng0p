@@ -13,35 +13,6 @@ interface IntlModule {
 	t: Record<string, unknown>;
 }
 
-const intlCache = new Map<string, string | undefined>();
-
-function resolveIntl(hash: string): string | undefined {
-	if (intlCache.has(hash)) return intlCache.get(hash);
-	for (const [mod] of lookupModules(withProps<IntlModule>("intl", "t"))) {
-		if (!(hash in mod.t)) continue;
-		let resolved: string | undefined;
-		try {
-			resolved = mod.intl.string(mod.t[hash]);
-		} catch {}
-		intlCache.set(hash, resolved);
-		return resolved;
-	}
-	return undefined;
-}
-
-function matchesHash(text: string, hashes: readonly string[]) {
-	return hashes.some((hash) => text === resolveIntl(hash));
-}
-
-const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-function matchesTemplate(text: string, templateHash: string) {
-	const template = resolveIntl(templateHash);
-	if (!template) return false;
-	const pattern = template.split(/\{[^}]*\}/).map(escapeRegExp).join(".*");
-	return new RegExp(`^${pattern}$`).test(text);
-}
-
 const HASH = {
 	deleteMessage: ["MWMcg7", "xwMqD7"],
 	removeEmbed: ["4sxKOb"],
@@ -54,6 +25,48 @@ const HASH = {
 
 const LEAVE_GROUP_TEMPLATE = "hJ5Ap4";
 const DELETE_ROLE_TEMPLATE = "FiMFTZ";
+
+const TEMPLATE_HASHES = [LEAVE_GROUP_TEMPLATE, DELETE_ROLE_TEMPLATE];
+const ALL_HASHES = [...Object.values(HASH).flat(), ...TEMPLATE_HASHES];
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+interface Strings {
+	text: Map<string, string>;
+	templates: Map<string, RegExp>;
+}
+
+let strings: Strings | undefined;
+
+// One pass over the intl modules; scanning them per dialog is what made opening one hitch.
+function loadStrings(): Strings {
+	const text = new Map<string, string>();
+	for (const [mod] of lookupModules(withProps<IntlModule>("intl", "t"))) {
+		for (const hash of ALL_HASHES) {
+			if (text.has(hash) || !(hash in mod.t)) continue;
+			try {
+				text.set(hash, mod.intl.string(mod.t[hash]));
+			} catch {}
+		}
+		if (text.size === ALL_HASHES.length) break;
+	}
+
+	const templates = new Map<string, RegExp>();
+	for (const hash of TEMPLATE_HASHES) {
+		const template = text.get(hash);
+		if (!template) continue;
+		const pattern = template.split(/\{[^}]*\}/).map(escapeRegExp).join(".*");
+		templates.set(hash, new RegExp(`^${pattern}$`));
+	}
+
+	return { text, templates };
+}
+
+const getStrings = () => (strings ??= loadStrings());
+
+const matchesHash = (text: string, hashes: readonly string[]) => hashes.some((hash) => text === getStrings().text.get(hash));
+
+const matchesTemplate = (text: string, templateHash: string) => getStrings().templates.get(templateHash)?.test(text) ?? false;
 
 const RULES: { on: keyof Settings; test: (key: string, title: string, content: string) => boolean; rest?: (props: any) => unknown }[] = [
 	{ on: "autoConfirmMessage", test: (_, t) => matchesHash(t, HASH.deleteMessage) },
@@ -141,6 +154,10 @@ const pickConfirm = (buttons: Btn[]) => {
 export default plugin({
 	jsonStorage: { default: DEFAULTS, load: true },
 	start({ jsonStorage, cleanup, logger, plugin }) {
+		getHttp();
+		const warmUp = setTimeout(getStrings, 3000);
+		cleanup(() => clearTimeout(warmUp));
+
 		const runRest = (sent: unknown, onDone?: () => void) => {
 			Promise.resolve(sent)
 				.then(() => onDone?.())

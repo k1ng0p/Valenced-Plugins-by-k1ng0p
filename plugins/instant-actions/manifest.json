@@ -5,7 +5,7 @@
 	"description": "No more 'Are you sure?' Skips deletes, leaves, blocks, and other prompts. Toggle each one individually.",
 	"icon": "FlashIcon",
 	"author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"dependencies": {
 		"valenced.api": {
 			"version": ">=1 <2"

@@ -9,7 +9,7 @@
       "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
       "icon": "FlashIcon",
       "channels": {
-        "latest": "1.0.1"
+        "latest": "1.0.2"
       },
       "versions": {
         "1.0.0": {
@@ -29,6 +29,19 @@
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.instant-actions@1.0.1.zip",
           "sha256": "c474ae693490a2eddd3822d76c113c7c0007988432fa3e4489ef9b5953c36994",
           "size": 3019,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.0.2": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.instant-actions@1.0.2.zip",
+          "sha256": "0c257bd1391024a041b93ca32c80090a206ce16ff1f9482dd0828dad7611a5cc",
+          "size": 2997,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"

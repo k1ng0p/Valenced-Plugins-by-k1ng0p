@@ -9,13 +9,26 @@
       "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
       "icon": "FlashIcon",
       "channels": {
-        "latest": "1.0.0"
+        "latest": "1.0.1"
       },
       "versions": {
         "1.0.0": {
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.instant-actions@1.0.0.zip",
           "sha256": "850efed88f3b98a0c01b47f9ad926a2e45d1826030139290ed75f97fbe3d33ac",
           "size": 2905,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.0.1": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.instant-actions@1.0.1.zip",
+          "sha256": "c474ae693490a2eddd3822d76c113c7c0007988432fa3e4489ef9b5953c36994",
+          "size": 3019,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
@@ -33,7 +46,7 @@
       "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
       "icon": "MagicWandIcon",
       "channels": {
-        "latest": "1.2.1"
+        "latest": "1.2.2"
       },
       "versions": {
         "1.0.0": {
@@ -92,6 +105,19 @@
           "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.junk-cleanup@1.2.1.zip",
           "sha256": "06ffc7e288e1cf4aa2e7540e23e19cbbc2dbefce281208d79e30fc5f21e911bd",
           "size": 6180,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.2.2": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.junk-cleanup@1.2.2.zip",
+          "sha256": "cd5cff5adeffd45b91f2c2ec33d953e54806f9462f70fea3abff0753409545fe",
+          "size": 6250,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"

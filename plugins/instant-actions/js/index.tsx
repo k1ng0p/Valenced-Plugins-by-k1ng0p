@@ -31,42 +31,40 @@ const ALL_HASHES = [...Object.values(HASH).flat(), ...TEMPLATE_HASHES];
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-interface Strings {
-	text: Map<string, string>;
-	templates: Map<string, RegExp>;
-}
+const strings = new Map<string, string>();
+const templates = new Map<string, RegExp>();
 
-let strings: Strings | undefined;
+// Intl modules may not all be loaded yet, so keep what was found and rescan only while some hashes are missing.
+function loadStrings() {
+	if (strings.size === ALL_HASHES.length) return;
 
-// One pass over the intl modules; scanning them per dialog is what made opening one hitch.
-function loadStrings(): Strings {
-	const text = new Map<string, string>();
 	for (const [mod] of lookupModules(withProps<IntlModule>("intl", "t"))) {
 		for (const hash of ALL_HASHES) {
-			if (text.has(hash) || !(hash in mod.t)) continue;
+			if (strings.has(hash) || !(hash in mod.t)) continue;
 			try {
-				text.set(hash, mod.intl.string(mod.t[hash]));
+				strings.set(hash, mod.intl.string(mod.t[hash]));
 			} catch {}
 		}
-		if (text.size === ALL_HASHES.length) break;
+		if (strings.size === ALL_HASHES.length) break;
 	}
 
-	const templates = new Map<string, RegExp>();
 	for (const hash of TEMPLATE_HASHES) {
-		const template = text.get(hash);
-		if (!template) continue;
+		const template = strings.get(hash);
+		if (!template || templates.has(hash)) continue;
 		const pattern = template.split(/\{[^}]*\}/).map(escapeRegExp).join(".*");
 		templates.set(hash, new RegExp(`^${pattern}$`));
 	}
-
-	return { text, templates };
 }
 
-const getStrings = () => (strings ??= loadStrings());
+const matchesHash = (text: string, hashes: readonly string[]) => {
+	loadStrings();
+	return hashes.some((hash) => text === strings.get(hash));
+};
 
-const matchesHash = (text: string, hashes: readonly string[]) => hashes.some((hash) => text === getStrings().text.get(hash));
-
-const matchesTemplate = (text: string, templateHash: string) => getStrings().templates.get(templateHash)?.test(text) ?? false;
+const matchesTemplate = (text: string, templateHash: string) => {
+	loadStrings();
+	return templates.get(templateHash)?.test(text) ?? false;
+};
 
 const RULES: { on: keyof Settings; test: (key: string, title: string, content: string) => boolean; rest?: (props: any) => unknown }[] = [
 	{ on: "autoConfirmMessage", test: (_, t) => matchesHash(t, HASH.deleteMessage) },
@@ -155,7 +153,7 @@ export default plugin({
 	jsonStorage: { default: DEFAULTS, load: true },
 	start({ jsonStorage, cleanup, logger, plugin }) {
 		getHttp();
-		const warmUp = setTimeout(getStrings, 3000);
+		const warmUp = setTimeout(loadStrings, 3000);
 		cleanup(() => clearTimeout(warmUp));
 
 		const runRest = (sent: unknown, onDone?: () => void) => {

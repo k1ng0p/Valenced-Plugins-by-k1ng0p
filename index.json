@@ -3,6 +3,30 @@
   "name": "k1ng_op Plugins",
   "description": "Stuff I’ve made and ported for Valenced",
   "plugins": {
+    "k1ngop.better-friend-list": {
+      "name": "Better Friend List",
+      "description": "One-tap access to your Friends screen from the You bar, with a tidier friends list.",
+      "author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+      "icon": "FriendsIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://k1ng0p.github.io/Valenced-Plugins-by-k1ng0p/pool/k1ngop.better-friend-list@1.0.0.zip",
+          "sha256": "aa76104b236bca3b6180536056ac1989ee8cf92beac9840fe584a02a5b2f7ec1",
+          "size": 2325,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
     "k1ngop.instant-actions": {
       "name": "Instant Actions",
       "description": "No more 'Are you sure?' Skips deletes, leaves, blocks, and other prompts. Toggle each one individually.",

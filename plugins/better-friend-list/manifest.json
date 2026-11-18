@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "k1ngop.better-friend-list",
+	"name": "Better Friend List",
+	"description": "One-tap access to your Friends screen from the You bar, with a tidier friends list.",
+	"author": "k1ng_op <641266820187160576> (https://github.com/k1ng0p \"GitHub\")",
+	"icon": "FriendsIcon",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}
